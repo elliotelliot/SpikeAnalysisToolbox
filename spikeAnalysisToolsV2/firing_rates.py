@@ -10,13 +10,14 @@ from . import data_loading as data
 """
 computes the time course of the instantanious Firing rate for layers
 Args:
-    spikes
-    network_architecture: dict containing
+    spikes: pandas data frame
+    network_architecture: dict 
     time_step: the temporal resolution
 Returns:
+    times: the start times for the bins. i.e. excitatory_timecourse[layer, timepoint_id, neuron_id] contains
+     the firint rate of the respective neuron in the intevall (times[timepoint_id], times[timepoint_id] + time_step)
     excitatory_timecourse: numpy array with dimensions [layer, timepoint, neuronid]
-    inhibitroy_timecourse: same shape
-
+    inhibitroy_timecourse: numpy array of same shape. 
 """
 def instant_FR_for_all_layers(spikes, network_architecture, time_step):
     n_neurons = (network_architecture["num_exc_neurons_per_layer"] + network_architecture["num_exc_neurons_per_layer"]) * network_architecture["num_layers"]
@@ -29,6 +30,7 @@ def instant_FR_for_all_layers(spikes, network_architecture, time_step):
     all_exc_collector = list()
 
     layerwise = helper.split_into_layers(spikes, network_architecture)
+
     for layer in layerwise:
         exc_spikes, inh_spikes = helper.split_exc_inh(layer, network_architecture)
         time_exc, inh_InstantFR = spikes_to_instantanious_FR(inh_spikes, (0, network_architecture["num_inh_neurons_per_layer"]), time_step, (t_start, t_end))
@@ -42,7 +44,7 @@ def instant_FR_for_all_layers(spikes, network_architecture, time_step):
     excitatory_timecourse = np.stack(all_exc_collector, axis=0)
     inhibitory_timecourse = np.stack(all_inh_collector, axis=0)
 
-    return excitatory_timecourse, inhibitory_timecourse
+    return time_exc, excitatory_timecourse, inhibitory_timecourse,
 
 
 """
@@ -55,7 +57,8 @@ Args:
 
 Returns:
     time: numpy array with the time steps
-    instantaneus_firing: numpy array of dimensions [timepoint, neuron_id] giving the scalar firing rate at every timepoint
+    instantaneus_firing: numpy array of dimensions [timepoint, neuron_id] giving the scalar firing rate of the neuron in the intervall
+        time[timepoint], time[timepoint]+time_step
 
 """
 def spikes_to_instantanious_FR(spikes, neuron_range, time_step, time_range=None):
@@ -115,9 +118,9 @@ def spikes_to_instantanious_FR(spikes, neuron_range, time_step, time_range=None)
     time_range: range in which the spikes are considered. if None all the spikes are taken (full stimulus)
 
 Returns:
-    rates: A list of numpy arrays. Each array of length equal to the number neurons, representing their rates. 
+    rates: pandas dataframe with columns "ids", "firing_rates"
 """
-def pandas_spikesToFR(spikes, neuron_range, time_range=None):
+def spikesToFR(spikes, neuron_range, time_range=None):
     assert ('ids' in spikes)
     assert ('times' in spikes)
     # Calculating the average firing rates (since we only present sounds for
@@ -162,6 +165,11 @@ Args:
     spikes_for_folder: nested list of shape [subfolder][extension]-> containing pandas dataframe with spike times and ids
     info_neurons: dict -> (will throw an error if it does not have the right field ;) )
     info_times:  dict
+    
+Returns:
+    nested list of dimensions [subfolder][extension][stimulus][layer][exh/inh]-> pandas data frame with columns "ids", "firing_rates"
+    
+    
 """
 def calculate_rates_subfolder(spikes_for_folder, info_neurons, info_times):
 
@@ -206,7 +214,7 @@ def stimuli_and_layerwise_firing_rates(spikes, network_architecture_info, info_t
     stimuli_responses = list()
     for stimulus_nr in range(info_times["num_stimuli"]):
         # print("stimulus: {}".format(stimulus_nr))
-        all_fr_stimulus = firing.pandas_spikesToFR(spikes_in_stimuli[stimulus_nr], neuron_range = (0, total_per_layer * network_architecture_info["num_layers"]), time_range=(timestart, timeend))
+        all_fr_stimulus = firing.spikesToFR(spikes_in_stimuli[stimulus_nr], neuron_range = (0, total_per_layer * network_architecture_info["num_layers"]), time_range=(timestart, timeend))
         # print("done with firing rates for all neurons")
 
         layerwise = helper.split_into_layers(all_fr_stimulus,  network_architecture_info)

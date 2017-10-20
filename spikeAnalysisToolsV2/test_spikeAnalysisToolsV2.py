@@ -14,7 +14,7 @@ class Test_FiringRates(unittest.TestCase):
         'times': [0.1, 0.11, 0.12, 0.5, 0.7, 0.99]
     })
     def test_FR(self):
-        rates = firing.pandas_spikesToFR(Test_FiringRates.spikes, (0, 10), (0, 1.0))
+        rates = firing.spikesToFR(Test_FiringRates.spikes, (0, 10), (0, 1.0))
         assert(rates.firing_rates.values[0] == 4)
         assert(rates.firing_rates.values[1] == 2)
 

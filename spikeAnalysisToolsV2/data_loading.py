@@ -4,15 +4,14 @@ import csv
 
 
 """
-Function to extract spike times and IDs from a binary or text file
+Function to extract spikes from a binary or text file
 
 Args:
     pathtofolder: String, Indicates path to output folder containing SpikeIDs/Times files
     binaryfile: Boolean Flag, Indicates if the output to expect is .bin or .txt (True/False)
 
 Returns:
-    ids: numpy array of neuron ids for each spike
-    times: numpy array of spike times for each spike (corresponding to the ids
+    pandas data frame with columns "ids" and "times" for the neuron id and spike time
 """
 def pandas_load_spikes(pathtofolder, binaryfile, input_neurons=False):
     ids, times = get_spikes(pathtofolder=pathtofolder, binaryfile=binaryfile, input_neurons=input_neurons)
@@ -73,7 +72,7 @@ def get_spikes(pathtofolder, binaryfile, input_neurons=False):
 
 
 """
-Imports the ids and times for all supfolders and stores them in list
+Imports the ids and times for all supfolders and stores them in a list of pandas data frames
 
 Args:
     masterpath: The Masterpath (i.e. "/Users/dev/Documents/Gisi/01_Spiking_Simulation/01_Spiking Network/Build/output/") 
@@ -83,8 +82,7 @@ Args:
     input_layer: If you want to look at the input layer only set this to true. 
 
 Returns:
-    all_subfolders_ids: all supfolders ids. For first subfolder all_subfolders_ids[0]
-    all_subfolders_times: all supfolders ids. For first subfolder all_subfolders_times[0]
+    all_subfolders: all supfolder spikes. shape [subfolder][extension]-> pandas data frame with all the spikes
 """
 def load_spikes_from_subfolders(masterpath, subfolders, extensions, input_layer):
     print("Start")
