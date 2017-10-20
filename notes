@@ -1,0 +1,9 @@
+# Gisi
+
+## Level of nesting
+all_subfolder_ids[subfolder][extension][layer][stimulus]
+
+# Clemens
+## Level of nesting
+subfolder / extension / stimulus / layer / exhitatory-inhibitory
+(first all the time then the internals of the network
