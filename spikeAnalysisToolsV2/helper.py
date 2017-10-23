@@ -108,3 +108,44 @@ def split_into_layers(neuron_activity, network_architecture_info):
 
 def _combine_spike_ids_and_times(ids, times):
     return pd.DataFrame({"ids": ids, "times": times})
+
+
+def z_transform(data, axis=0):
+    """
+    z transform of the given data along the given axis
+    :param data:
+    :param axis: defaults to 0 which for data of shape [stimulus, layer, neuron_id] gives you the relative response for each stimulus
+    :return:
+    """
+    mean = np.mean(data, axis=axis)
+    sigma = np.std(data, axis=axis)
+
+    transformed = (data - mean) / sigma
+
+    return np.nan_to_num(transformed)
+
+
+
+def reshape_into_2d(unshaped):
+    """
+    takes an arbitrary numpy array and replaces the last dimension with 2 dimensions of same length
+    Args:
+        unshaped: numpy array of shape [..., n_neurons]
+    Returns:
+        numpy array of shape [..., sqrt(n_neurons), sqrt(n_neurons]
+    Raises:
+        Exception if n_neurons is not a square
+    """
+    dimensions = unshaped.shape
+    n_neurons = dimensions[-1]
+
+    side_length = np.sqrt(n_neurons)
+    if(side_length % 1 != 0):
+        raise RuntimeError("The last dimension is not a square number: {}".format(n_neurons))
+
+    side_length = int(side_length)
+
+
+    return np.reshape(unshaped, dimensions[:-1] + (side_length, side_length), order="F")
+
+

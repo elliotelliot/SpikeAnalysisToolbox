@@ -161,7 +161,7 @@ def folder_info_analysis(masterpath, subfolder, extension, neuronstart, neuronen
     # Removing any bias in FR
     for n in range(num_stimuli):
         # Individually remove the means
-        rates[n] -= np.mean(rates[n])
+        rates[n] -= np.mean(rates[n]) # mean of all neurons within that stimulus
     neuronmeans = np.mean(np.asarray(rates), axis=0)
 
     for n in range(num_stimuli):
@@ -170,7 +170,7 @@ def folder_info_analysis(masterpath, subfolder, extension, neuronstart, neuronen
     # For each stimulus
     filtered_rates = list()
     for stimulus_index in range(num_stimuli):
-        ratemean = np.mean(rates[stimulus_index])
+        ratemean = np.mean(rates[stimulus_index]) # uses mean of ALL neurons for ONE stimulus
         ratestd = np.std(rates[stimulus_index])
         filtered_rates.append(np.zeros(rates[stimulus_index].shape))
 

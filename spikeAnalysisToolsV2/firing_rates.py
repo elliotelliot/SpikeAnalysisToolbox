@@ -225,3 +225,33 @@ def stimuli_and_layerwise_firing_rates(spikes, network_architecture_info, info_t
         # this is no [(exc_l1, inh_l1), (exc_l2, inh_l2), ... , (excl4, inhl4)]
         stimuli_responses.append(exc_inh_layerwise)
     return stimuli_responses
+
+
+def digitize_firing_rates_with_equispaced_bins(firing_rates, n_bins):
+    """
+    Digitizes firing rates such that every firing rate has a value in [0, n_bins[
+    For every neuron, the different firing rates for the different stimuli are divided into equally spaced bins. Stringer 2005
+
+    The bin borders are the same for a given neuron over all stimuli, but different for 2 neurons in the same stimulus
+
+    :param firing_rates:
+    :param n_bins:
+    :return:
+    """
+    n_stimuli, n_layer, n_neurons = firing_rates.shape
+
+    minimal_response = np.min(firing_rates, axis=0)
+    maximal_response = np.max(firing_rates, axis=0) + 1 # +1 cause the last one is <
+
+    categorized_firing_rates = np.empty((n_stimuli, n_layer, n_neurons), dtype=int)
+
+    for l in range(n_layer):
+        for n in range(n_neurons):
+            bins = np.linspace(minimal_response[l, n], maximal_response[l, n], n_bins+1) # +1 because for n bin boundraries there are only n-1 buckets
+            categorized_firing_rates[:, l, n] = np.digitize(firing_rates[:, l, n], bins) - 1
+
+
+    assert(not np.any((categorized_firing_rates.flatten() < 0)))
+    assert(not np.any((categorized_firing_rates.flatten() >= n_bins)))
+
+    return categorized_firing_rates
