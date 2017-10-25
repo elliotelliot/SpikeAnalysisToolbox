@@ -149,3 +149,9 @@ def reshape_into_2d(unshaped):
     return np.reshape(unshaped, dimensions[:-1] + (side_length, side_length), order="F")
 
 
+def epoch_subfolders_to_tensor(all_epochs):
+    """
+    Converts a nested list of firing rates to 2 numpy arrays
+    :param all_epochs: nested list of shape [epoch][stimulus][layer][excitatory/inhibitory] -> pandas dataframe with "ids" and "firing_rates"
+    :return: exc_rates,
+    """

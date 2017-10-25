@@ -53,13 +53,44 @@ def single_cell_information(freq_table):
    return information
 
 
-def firing_rates_to_single_cell_information(firing_rates, objects, n_bins):
+def firing_rates_to_single_cell_information(firing_rates, objects, n_bins, calc_inhibitory=False):
    exc_rates, inh_rates = helper.stimulus_layer_nested_list_2_numpy_tensor(firing_rates)
 
    exc_table = combine.response_freq_table(exc_rates, objects, n_bins=n_bins)
-   inh_table = combine.response_freq_table(inh_rates, objects, n_bins=n_bins)
 
    exc_info = single_cell_information(exc_table)
-   inh_info = single_cell_information(inh_table)
+
+   if calc_inhibitory:
+       inh_table = combine.response_freq_table(inh_rates, objects, n_bins=n_bins)
+       inh_info = single_cell_information(inh_table)
+   else:
+       inh_info = None
 
    return exc_info, inh_info
+
+def information_all_epochs(firing_rates_all_epochs, objects, n_bins, calc_inhibitory=False):
+    """
+    Converts a nested list of firing rates to 2 numpy arrays
+    :param firing_rates_all_epochs: nested list of shape [epoch][stimulus][layer][excitatory/inhibitory] -> pandas dataframe with "ids" and "firing_rates"
+    :return: exc_info, inh_info
+    each is a numpy array of shape [epoch, object, layer, neuronid] -> information value
+    """
+
+    exc_list = []
+    inh_list = []
+
+    print("Epoch: >>  ", end = "")
+    for i, epoch in enumerate(firing_rates_all_epochs):
+        exc, inh = firing_rates_to_single_cell_information(epoch, objects, n_bins, calc_inhibitory)
+        exc_list.append(exc)
+        inh_list.append(inh)
+        print(i, end = "  ")
+
+    exc_np = np.stack(exc_list, axis=0)
+    if calc_inhibitory:
+        inh_np = np.stack(inh_list, axis=0)
+    else:
+        inh_np = None
+
+    return exc_np, inh_np
+

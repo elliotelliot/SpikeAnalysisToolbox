@@ -73,6 +73,6 @@ def response_freq_table(firing_rates, objects, n_bins=10):
 
         freq_table[object_id, :, :, :] /= len(belonging_stimuli)
 
-    assert(np.all(np.isclose(np.sum(freq_table, axis=3), 1)))
+    # assert(np.all(np.isclose(np.sum(freq_table, axis=3), 1)))
 
     return freq_table

@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import unittest
 import sys
+from timeit import default_timer as timer
 
 
 sys.path.append("/Users/clemens/Documents/Code/AnalysisToolbox")
@@ -77,26 +78,29 @@ class Test_combine_stimuli(unittest.TestCase):
 
 
 
-
+        start = timer()
         exc_table = combine.response_freq_table(exc_rates, objects, n_bins=n_bins)
 
         exc_info = info.single_cell_information(exc_table)
 
         final_new_info_l2 = exc_info[:, 2, :] # shape [2, n_neurons] for both objects all info in layer 2
+        print("New version of info calc took {}s".format(timer() - start))
 
         ### calculating it the old way
         import InformationAnalysis as infoOld
 
+        categories = np.zeros((56, 1))
+        categories[28:, 0] = 1 # simulating the fact that we have 2 objects -> stimuli with only one attribute, object_id 1 or 0
 
+        start = timer()
         digitized_firing_rates = firing.digitize_firing_rates_with_equispaced_bins(exc_rates, n_bins=n_bins)
 
         digitized_firing_rates_l2 = digitized_firing_rates[:, 2, :]
 
-        categories = np.zeros((56, 1))
-        categories[28:, 0] = 1 # simulating the fact that we have 2 objects -> stimuli with only one attribute, object_id 1 or 0
 
         freq_table_old = infoOld.frequency_table(digitized_firing_rates_l2, categories, list(range(n_bins)))
         final_old_info_l2 = infoOld.single_cell_information(freq_table_old, categories)[0]
+        print("Old version of info calc took {}s".format(timer() - start))
 
         assert(np.all(np.isclose(final_new_info_l2, final_old_info_l2)))
 

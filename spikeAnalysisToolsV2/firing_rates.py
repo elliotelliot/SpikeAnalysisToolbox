@@ -178,10 +178,13 @@ def calculate_rates_subfolder(spikes_for_folder, info_neurons, info_times):
     for subfolder in range(len(spikes_for_folder)):
 
         extension_rates = list()
+        print("subfolder {}: Extension >>  ".format(subfolder), end="")
 
         for extension in range(len(spikes_for_folder[0])):
+            print(extension, end="  ")
             atomic_folder_rates = stimuli_and_layerwise_firing_rates(spikes_for_folder[subfolder][extension], info_neurons, info_times)
             extension_rates.append(atomic_folder_rates)
+        print("")
 
         subfolder_rates.append(extension_rates)
 
@@ -207,6 +210,13 @@ def stimuli_and_layerwise_firing_rates(spikes, network_architecture_info, info_t
     num_exc_neurons_per_layer = network_architecture_info["num_exc_neurons_per_layer"]
     num_inh_neurons_per_layer = network_architecture_info["num_inh_neurons_per_layer"]
     total_per_layer = num_exc_neurons_per_layer + num_inh_neurons_per_layer
+
+    # check if the number of stimuli and the stimuli length are reasonable. i.e. if total_length is ok
+    last_spike = np.max(spikes.times)
+    if(last_spike > total_length):
+        raise ValueError("The last spike was after the last stimulus was presented: length_of_stimulus or num_stimuli seems to be wrong")
+    if(last_spike < total_length - length_of_stimulus):
+        raise ValueError("There were no spikes during the last stimulus: length_of_stimulus or num_stimuli seems to be wrong")
 
     spikes_in_stimuli = helper.splitstimuli(spikes, length_of_stimulus)
 
