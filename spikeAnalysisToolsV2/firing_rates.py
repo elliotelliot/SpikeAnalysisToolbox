@@ -80,6 +80,11 @@ def spikes_to_instantanious_FR(spikes, neuron_range, time_step, time_range=None)
     t_start = int(np.floor(t_start * (1 / time_step)))
     t_end = int(np.ceil(t_end * (1 / time_step)))
 
+    instantanious_firing = np.zeros(((t_end - t_start), (neuron_end - neuron_start)))
+
+    if len(spikes)==0:
+        return np.array(range(t_start, t_end)) * time_step, instantanious_firing
+
     relevant_spikes = spikes[mask].copy()
 
     spike_times = relevant_spikes.times.values
@@ -99,7 +104,6 @@ def spikes_to_instantanious_FR(spikes, neuron_range, time_step, time_range=None)
     count_they_spiked = occurance_count
 
 
-    instantanious_firing = np.zeros(((t_end - t_start), (neuron_end - neuron_start)))
 
     instantanious_firing[times_they_spiked, ids_that_spiked] = count_they_spiked
 
