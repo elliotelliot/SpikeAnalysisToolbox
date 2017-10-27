@@ -1,4 +1,5 @@
 import numpy as np
+from numba import jit
 
 from . import firing_rates as firing
 
@@ -45,6 +46,7 @@ def min_responses(responses, list_of_objects):
     return object_responses
 
 
+@jit(cache=True)
 def response_freq_table(firing_rates, objects, n_bins=10):
     """
     Combine multiple presenations (stimuli) of the same objects into a frequency table that gives you
@@ -62,7 +64,6 @@ def response_freq_table(firing_rates, objects, n_bins=10):
     n_stimuli, n_layer, n_neurons = firing_rates.shape
 
     freq_table = np.empty((len(objects), n_layer, n_neurons, n_bins), dtype=float)
-
 
     for object_id, belonging_stimuli in enumerate(objects):
         for l in range(n_layer):

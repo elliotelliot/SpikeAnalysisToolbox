@@ -109,3 +109,28 @@ def load_spikes_from_subfolders(masterpath, subfolders, extensions, input_layer)
             all_subfolders.append(all_extensions)
 
     return all_subfolders
+
+
+def load_testing_stimuli_info(experiment_folder):
+    """
+    load the information about the stimuli presented during testing. There is assumed to be a file "testing_list.txt" with the information in the experiment_folder
+    :param experiment_folder: top level folder of the experiment
+    :return:
+    """
+    objects = []
+    current_object = {'count': 0, 'elements': set()}
+    with open(experiment_folder + "/testing_list.txt", "r") as file:
+        for line in file:
+            raw_text = line.strip()
+            if raw_text == "*":
+                # make new object
+                objects.append(current_object)
+                current_object = {'count': 0, 'elements': set()}
+            else:
+                current_object['elements'].add(raw_text)
+                current_object['count'] += 1
+    objects.append(current_object)
+
+    proper_objects = [obj for obj in objects if obj['count'] != 0]
+    return proper_objects
+

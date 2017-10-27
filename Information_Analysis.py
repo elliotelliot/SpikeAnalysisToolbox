@@ -157,6 +157,7 @@ def folder_info_analysis(masterpath, subfolder, extension, neuronstart, neuronen
     num_stimuli = len(ids)
     rates = data.spikesToFR(ids_tmp, times_tmp, neuronstart, neuronend, firing_rate_start_time, firing_rate_end_time,
                             False)
+    # rates is list [stimulus]-> numpy array of all rates
 
     # Removing any bias in FR
     for n in range(num_stimuli):

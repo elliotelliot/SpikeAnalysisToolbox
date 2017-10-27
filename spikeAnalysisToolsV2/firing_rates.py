@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+from multiprocessing import Pool
+from numba import jit
 
 # from helper import *
 from . import helper
@@ -36,7 +38,7 @@ def instant_FR_for_all_layers(spikes, network_architecture, time_step):
         time_exc, inh_InstantFR = spikes_to_instantanious_FR(inh_spikes, (0, network_architecture["num_inh_neurons_per_layer"]), time_step, (t_start, t_end))
         time_inh, exc_InstantFR = spikes_to_instantanious_FR(exc_spikes, (0, network_architecture["num_exc_neurons_per_layer"]), time_step, (t_start, t_end))
 
-        assert(np.all(time_exc == time_inh))
+        # assert(np.all(time_exc == time_inh))
 
         all_inh_collector.append(inh_InstantFR)
         all_exc_collector.append(exc_InstantFR)
@@ -93,7 +95,7 @@ def spikes_to_instantanious_FR(spikes, neuron_range, time_step, time_range=None)
     # will count the number of occurances of the same columns (because axis 1) which represents a specific neuron spiking at a specific time
 
     ids_that_spiked = id_time_pairs[0, :]
-    times_they_spiked = id_time_pairs[1, :]
+    times_they_spiked = id_time_pairs[1, :] - t_start
     count_they_spiked = occurance_count
 
 
@@ -120,6 +122,7 @@ def spikes_to_instantanious_FR(spikes, neuron_range, time_step, time_range=None)
 Returns:
     rates: pandas dataframe with columns "ids", "firing_rates"
 """
+# @jit(cache=True)
 def spikesToFR(spikes, neuron_range, time_range=None):
     assert ('ids' in spikes)
     assert ('times' in spikes)
@@ -173,12 +176,38 @@ Returns:
 """
 def calculate_rates_subfolder(spikes_for_folder, info_neurons, info_times):
 
+
+    worker_pool = Pool(processes=5)
+
+    subfolder_rates = list()
+
+    for subfolder in range(len(spikes_for_folder)):
+
+        # extension_rates = list()
+
+        extension_rates_pro = worker_pool.map(Caller(stimuli_and_layerwise_firing_rates, info_neurons, info_times), spikes_for_folder[subfolder])
+
+        # for extension in range(len(spikes_for_folder[0])):
+        #     print(extension, end="  ")
+        #     atomic_folder_rates = stimuli_and_layerwise_firing_rates(spikes_for_folder[subfolder][extension], info_neurons, info_times)
+        #     extension_rates.append(atomic_folder_rates)
+        # print("")
+        # assert(np.all(extension_rates[0][3][3][0] == extension_rates_pro[0][3][3][0]))
+
+        subfolder_rates.append(extension_rates_pro)
+
+    return subfolder_rates
+
+def slow_calculate_rates_subfolder(spikes_for_folder, info_neurons, info_times):
+
+
+
     subfolder_rates = list()
 
     for subfolder in range(len(spikes_for_folder)):
 
         extension_rates = list()
-        print("subfolder {}: Extension >>  ".format(subfolder), end="")
+        print("Starting subfolder >>  ", end="")
 
         for extension in range(len(spikes_for_folder[0])):
             print(extension, end="  ")
@@ -201,6 +230,7 @@ Args:
 Returns:
     nested list with dimensions meaning [stimulus, layer, (exc/inh)]
 """
+# @jit(cache=True)
 def stimuli_and_layerwise_firing_rates(spikes, network_architecture_info, info_times):
     length_of_stimulus = info_times["length_of_stimulus"]
     total_length = length_of_stimulus * info_times["num_stimuli"]
@@ -237,6 +267,7 @@ def stimuli_and_layerwise_firing_rates(spikes, network_architecture_info, info_t
     return stimuli_responses
 
 
+@jit(cache=True)
 def digitize_firing_rates_with_equispaced_bins(firing_rates, n_bins):
     """
     Digitizes firing rates such that every firing rate has a value in [0, n_bins[
@@ -261,7 +292,21 @@ def digitize_firing_rates_with_equispaced_bins(firing_rates, n_bins):
             categorized_firing_rates[:, l, n] = np.digitize(firing_rates[:, l, n], bins) - 1
 
 
-    assert(not np.any((categorized_firing_rates.flatten() < 0)))
-    assert(not np.any((categorized_firing_rates.flatten() >= n_bins)))
+    # assert(not np.any((categorized_firing_rates.flatten() < 0)))
+    # assert(not np.any((categorized_firing_rates.flatten() >= n_bins)))
 
     return categorized_firing_rates
+
+
+class Caller(object):
+    def __init__(self, function, *args):
+        """
+        when you call an instance of this object with obj(input) it will call function(input, *args)
+
+        :param function:  the function that should be called
+        :param args:  oter params that the function takes
+        """
+        self.function = function
+        self.args = args[:]
+    def __call__(self, input):
+        return self.function(input, *self.args)

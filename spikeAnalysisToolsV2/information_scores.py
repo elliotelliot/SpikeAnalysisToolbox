@@ -1,4 +1,6 @@
 import numpy as np
+from numba import jit
+from multiprocessing import Pool
 
 from . import helper
 from . import combine_stimuli as combine
@@ -24,7 +26,7 @@ def min_response_to_one_transform(firing_rates, objects):
    return exh_min_objects, inh_min_objects
 
 
-
+@jit(cache=True)
 def single_cell_information(freq_table):
    """
    Calculate single cell information according to Stringer 2005
@@ -53,6 +55,7 @@ def single_cell_information(freq_table):
    return information
 
 
+# @jit(cache=True)
 def firing_rates_to_single_cell_information(firing_rates, objects, n_bins, calc_inhibitory=False):
    exc_rates, inh_rates = helper.stimulus_layer_nested_list_2_numpy_tensor(firing_rates)
 
@@ -76,6 +79,48 @@ def information_all_epochs(firing_rates_all_epochs, objects, n_bins, calc_inhibi
     each is a numpy array of shape [epoch, object, layer, neuronid] -> information value
     """
 
+    #multiprocessing implementation
+    worker_pool = Pool(processes=5)
+
+    tmp_caller = Caller(firing_rates_to_single_cell_information, objects, n_bins, calc_inhibitory)
+
+
+    exc_inh_info = worker_pool.map(tmp_caller, firing_rates_all_epochs)
+    # this is a list of tuple [(exc_info_epoch1, inh_info_epoch1), (exc_info_epoch2, inh_info_epoch2),...]
+
+    exc_info_fast, inh_info_fast = zip(*exc_inh_info)
+
+    # exc_list = []
+    # inh_list = []
+    #
+    # print("Epoch: >>  ", end = "")
+    # for i, epoch in enumerate(firing_rates_all_epochs):
+    #     exc, inh = firing_rates_to_single_cell_information(epoch, objects, n_bins, calc_inhibitory)
+    #     exc_list.append(exc)
+    #     inh_list.append(inh)
+    #     print(i, end = "  ")
+    #
+    # exc_np = np.stack(exc_list, axis=0)
+    exc_np_fast = np.stack(exc_info_fast, axis=0)
+    if calc_inhibitory:
+        # inh_np = np.stack(inh_list, axis=0)
+        inh_np_fast = np.stack(inh_info_fast)
+    else:
+        inh_np_fast = None
+
+    # assert(np.all(exc_np == exc_np_fast))
+
+    return exc_np_fast, inh_np_fast
+
+
+def slow_information_all_epochs(firing_rates_all_epochs, objects, n_bins, calc_inhibitory=False):
+    """
+    Converts a nested list of firing rates to 2 numpy arrays
+    :param firing_rates_all_epochs: nested list of shape [epoch][stimulus][layer][excitatory/inhibitory] -> pandas dataframe with "ids" and "firing_rates"
+    :return: exc_info, inh_info
+    each is a numpy array of shape [epoch, object, layer, neuronid] -> information value
+    """
+
     exc_list = []
     inh_list = []
 
@@ -92,5 +137,19 @@ def information_all_epochs(firing_rates_all_epochs, objects, n_bins, calc_inhibi
     else:
         inh_np = None
 
+    # assert(np.all(exc_np == exc_np_fast))
+
     return exc_np, inh_np
 
+class Caller(object):
+    def __init__(self, function, *args):
+        """
+        when you call an instance of this object with obj(input) it will call function(input, *args)
+
+        :param function:  the function that should be called
+        :param args:  oter params that the function takes
+        """
+        self.function = function
+        self.args = args[:]
+    def __call__(self, input):
+        return self.function(input, *self.args)

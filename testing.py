@@ -111,4 +111,65 @@ def test_functional_freq_table():
     return single_cell_info
 
 
-bla = test_functional_freq_table()
+def test_animated_hist():
+    ## set the Masterpath to the folder where your output is saved
+    n_epochs = 19
+
+    masterpath = "/Users/clemens/Documents/Code/ModelClemens/output"
+    ## set the subfolder to the Simulation you want to analyse
+
+    subfolders = [
+        "10_25-19_10_only_loc_1"
+    ]
+    ## if more than the inital epoch is needed *1 needs to be run
+    extensions = ["initial"] + ["testing/epoch{}".format(n) for n in range(1, n_epochs)]
+
+    object_list = data.load_testing_stimuli_info(
+        masterpath + "/" + subfolders[0])  # assuming all the subfolders have the same
+    n_stimuli = np.sum(obj['count'] for obj in object_list)
+
+    current_index = 0
+    object_indices = []
+    for obj in object_list:
+        object_indices.append(list(range(current_index, current_index + obj['count'])))
+        current_index += obj["count"]
+
+    # info_neurons is just an array of the information from above. This makes it easier to run the functions and pass the information.
+    # info_times same for times
+    network_architecture = dict(
+        num_exc_neurons_per_layer=64 * 64,
+        num_inh_neurons_per_layer=32 * 32,
+        num_layers=4,
+        # total_per_layer = num_exc_neurons_per_layer + num_inh_neurons_per_layer,
+        # total_network = total_per_layer * num_layers,
+        # num_stimuli = 16
+    )
+
+    info_times = dict(
+        length_of_stimulus=2.0,
+        num_stimuli=n_stimuli,
+        time_start=1.5,
+        time_end=1.9
+    )
+
+    spikes = data.load_spikes_from_subfolders(masterpath, subfolders, extensions, False)
+    start = timer()
+    # rates_subfolders = firing.slow_calculate_rates_subfolder(
+    #     spikes,
+    #     network_architecture,
+    #     info_times)
+    # print("Non multiprocessing version took {}".format(timer() - start))
+
+    start = timer()
+    rates_subfolders = firing.calculate_rates_subfolder(
+        spikes,
+        network_architecture,
+        info_times)
+    print("Multiprocessing version took {}".format(timer() - start))
+    exc_information, inhibitory_information = info.information_all_epochs(rates_subfolders[0], object_indices, 3)
+    ani = spikeplot.plot_animated_histogram(exc_information)
+    import matplotlib.pyplot as plt
+    plt.show()
+
+
+bla = test_animated_hist()
