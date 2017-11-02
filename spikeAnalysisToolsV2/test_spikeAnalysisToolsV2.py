@@ -14,6 +14,7 @@ import spikeAnalysisToolsV2.overviews as overview
 import spikeAnalysisToolsV2.combine_stimuli as combine
 import spikeAnalysisToolsV2.plotting as spikeplot
 import spikeAnalysisToolsV2.information_scores as info
+import spikeAnalysisToolsV2.synapse_analysis as synapse_analyis
 
 
 
@@ -35,17 +36,17 @@ class Test_FiringRates(unittest.TestCase):
 
 
 class Test_combine_stimuli(unittest.TestCase):
-
+    @unittest.skip("needs proper data")
     def test_single_cell_information(self):
         masterpath = "/Users/clemens/Documents/Code/ModelClemens/output"
         ## set the subfolder to the Simulation you want to analyse
 
         subfolders = [
-            "2017:10:23-17:39:33_only_loc_1_lots_of_testing_300_epochs"
+            "10_26-18_14_short_test_loc1"
         ]
         ## if more than the inital epoch is needed *1 needs to be run
         extensions = [
-            "testing/epoch20"
+            "initial"
         ]
 
         # info_neurons is just an array of the information from above. This makes it easier to run the functions and pass the information.
@@ -61,7 +62,7 @@ class Test_combine_stimuli(unittest.TestCase):
 
         info_times = dict(
             length_of_stimulus=2.0,
-            num_stimuli=56,
+            num_stimuli=16,
             time_start=1.5,
             time_end=1.9
         )
@@ -74,7 +75,7 @@ class Test_combine_stimuli(unittest.TestCase):
         rates = firing_rates[0][0]
         exc_rates, inh_rates = helper.stimulus_layer_nested_list_2_numpy_tensor(rates)
 
-        objects = [list(range(28)), list(range(28, 28 + 28))]  # each is presented twice
+        objects = [[0,1,2,3,8,9,10,11], [4,5,6,7,12,13,14,15]]  # each is presented twice
 
 
 
@@ -103,6 +104,26 @@ class Test_combine_stimuli(unittest.TestCase):
         print("Old version of info calc took {}s".format(timer() - start))
 
         assert(np.all(np.isclose(final_new_info_l2, final_old_info_l2)))
+
+class Test_Weights(unittest.TestCase):
+    def test_masks(self):
+        path = "/Users/clemens/Documents/Code/ModelClemens/output/10_26-18_14_short_test_loc1/initial"
+        synapses = data.load_network(path, True, True)
+
+
+
+        mask = synapse_analyis.Synapse_Mask(dict(num_exc_neurons_per_layer=64*64, num_inh_neurons_per_layer= 32*32, num_layers=4), synapses)
+
+        exc_FF = mask.exc_feed_forward()
+        exc_FB = mask.exc_feed_back()
+        exc_L = mask.exc_lateral()
+        inh_L = mask.inh_lateral()
+        exc_to_inh_L = mask.exc_to_inhibitory()
+
+        unique = exc_FF ^ exc_FB ^ exc_L ^ inh_L ^ exc_to_inh_L
+
+        assert(np.all(unique))
+
 
 
 

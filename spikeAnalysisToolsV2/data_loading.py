@@ -118,19 +118,108 @@ def load_testing_stimuli_info(experiment_folder):
     :return:
     """
     objects = []
-    current_object = {'count': 0, 'elements': set()}
+    current_object = {'count': 0, 'elements': set(), 'indices': list()}
+    current_stim_index = 0
     with open(experiment_folder + "/testing_list.txt", "r") as file:
         for line in file:
             raw_text = line.strip()
             if raw_text == "*":
                 # make new object
                 objects.append(current_object)
-                current_object = {'count': 0, 'elements': set()}
+                current_object = {'count': 0, 'elements': set(), 'indices': list()}
             else:
                 current_object['elements'].add(raw_text)
                 current_object['count'] += 1
+                current_object['indices'] += [current_stim_index]
+                current_stim_index += 1
     objects.append(current_object)
 
     proper_objects = [obj for obj in objects if obj['count'] != 0]
     return proper_objects
 
+
+"""
+Function to extract the pre, post, weight and delays of a network structure
+
+Args:
+    pathtofolder: string path to the folder in which network files are stored
+    binaryfile: True/False flag if it is binary file
+    intial_weighs: True/False flag wether to load initial weights
+
+Returns:
+    Pandas data frame with the following colums:
+    pre: list of synapse presynaptic indices
+    post: list of synapse postsynaptic indices
+    delays: list of synaptic delays (in units of timesteps)
+    init_weights: list of synaptic weights (before training) only if initial_weights=True
+    weights: list of synaptic weights after training
+"""
+def load_network(pathtofolder, binaryfile, inital_weights):
+    if pathtofolder[-1] != "/":
+        pathtofolder += "/"
+
+    pre, post, delays, init_weights , weights = _raw_load_network(pathtofolder, binaryfile, inital_weights)
+    data = dict(pre=pre, post=post, delays=delays, weights=weights)
+    if inital_weights:
+        data['init_weights'] = init_weights
+
+    return pd.DataFrame(data=data)
+
+
+def _raw_load_network(pathtofolder, binaryfile, inital_weights):
+    pre = list()
+    post = list()
+    delays = list()
+    if inital_weights:
+        init_weights = list()
+    else:
+        init_weights = None
+    weights = list()
+
+    if (binaryfile):
+        pre = np.fromfile(pathtofolder +
+                          'Synapses_NetworkPre' + '.bin',
+                          dtype=np.int32)
+        post = np.fromfile(pathtofolder +
+                           'Synapses_NetworkPost' + '.bin',
+                           dtype=np.int32)
+        delays = np.fromfile(pathtofolder +
+                             'Synapses_NetworkDelays' + '.bin',
+                             dtype=np.int32)
+        if inital_weights:
+            init_weights = np.fromfile(pathtofolder + 'Synapses_NetworkWeights_Initial' + '.bin',
+                                       dtype=np.float32)
+        weights = np.fromfile(pathtofolder +
+                              'Synapses_NetworkWeights' + '.bin',
+                              dtype=np.float32)
+
+        return pre, post, delays, init_weights, weights
+    else:
+
+        # For each file type output by the network, load them
+        with open(pathtofolder + 'Synapses_NetworkPre.txt', 'r') as csvfile:
+            reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+            for row in reader:
+                pre.append(int(row[0]))
+
+        with open(pathtofolder + 'Synapses_NetworkPost.txt', 'r') as csvfile:
+            reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+            for row in reader:
+                post.append(int(row[0]))
+
+        with open(pathtofolder + 'Synapses_NetworkDelays.txt', 'r') as csvfile:
+            reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+            for row in reader:
+                delays.append(int(row[0]))
+        if inital_weights:
+            with open(pathtofolder + 'Synapses_NetworkWeights_Initial.txt', 'r') as csvfile:
+                reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+                for row in reader:
+                    init_weights.append(float(row[0]))
+
+        with open(pathtofolder + 'Synapses_NetworkWeights.txt', 'r') as csvfile:
+            reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+            for row in reader:
+                weights.append(float(row[0]))
+
+    return (pre, post, delays, init_weights, weights)

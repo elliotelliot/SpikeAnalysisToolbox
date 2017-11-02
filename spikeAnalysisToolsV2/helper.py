@@ -53,6 +53,125 @@ def stimulus_layer_nested_list_2_numpy_tensor(all_stimuli_rates):
     return excitatory_rates, inhibitory_rates
 
 
+def neuron_target_column_to_numpy_array(data, target_column, network_architecture):
+    """pandas dataframe with a column about each neuron to 2 numpy array with the values in that shape
+
+    Args:
+        data: pandas dataframe with columns "ids" and target_column
+        target_column: string of the name for the target column
+        network_architecture: dict with usual fields
+    Returns:
+        (exc, inh)
+        each a numpy array of shape [layer, neuron_id]
+    """
+    neurons_per_layer = network_architecture["num_exc_neurons_per_layer"] + network_architecture["num_inh_neurons_per_layer"]
+    result_exc = np.zeros(([network_architecture["num_layers"], network_architecture["num_exc_neurons_per_layer"]]))
+    result_inh = np.zeros(([network_architecture["num_layers"], network_architecture["num_inh_neurons_per_layer"]]))
+
+    layerwise = split_into_layers(data, network_architecture)
+    for i, layer_data in enumerate(layerwise):
+        exc, inh = split_exc_inh(layer_data, network_architecture)
+        result_exc[i, exc.ids.values] = exc[target_column].values
+        result_inh[i, inh.ids.values] = inh[target_column].values
+
+    return result_exc, result_inh
+
+def id_to_position(id, network_info):
+    """
+    given the id of a neuron it calculates its coordinates in the network
+    :param id:
+    :return: is_it_excitatory? , tuple with position of neuron [layer, row, column]
+    """
+    num_exc_neurons_per_layer = network_info["num_exc_neurons_per_layer"]
+    num_inh_neurons_per_layer = network_info["num_inh_neurons_per_layer"]
+    total_per_layer = num_exc_neurons_per_layer + num_inh_neurons_per_layer
+
+    layer = id // total_per_layer
+    id_within_layer = id - (layer * total_per_layer)
+
+    exc_neuron = id_within_layer < num_exc_neurons_per_layer
+
+    if exc_neuron:
+        n_in_layer_type = num_exc_neurons_per_layer
+    else:
+        n_in_layer_type = num_inh_neurons_per_layer
+        id_within_layer -= num_exc_neurons_per_layer
+
+    side_length = np.sqrt(n_in_layer_type)
+    if (side_length % 1 != 0):
+        raise RuntimeError("The number of neurons ber layer is not a square number: {}".format(n_in_layer_type))
+
+    x = id_within_layer // side_length
+    y = id_within_layer % side_length
+
+
+    return exc_neuron, (int(layer), int(y), int(x))
+
+
+def position_to_id(pos, is_excitatory, network_info):
+    """
+    Calculate receptive field of a neuron
+    :param pos: position of the neuron as a tuple [layer, line, column]
+    :param is_excitatory: True -> excitatory neuron, False -> inhibitory neuron
+    :param network_info: usual dict
+    :return id: overall id of the neuron
+    """
+    layer, line, column = pos
+
+    num_exc_neurons_per_layer = network_info["num_exc_neurons_per_layer"]
+    num_inh_neurons_per_layer = network_info["num_inh_neurons_per_layer"]
+    total_per_layer = num_exc_neurons_per_layer + num_inh_neurons_per_layer
+
+    first_in_layer_id = layer * total_per_layer
+
+    if is_excitatory:
+        n_in_layer_type = num_exc_neurons_per_layer
+    else:
+        n_in_layer_type = num_inh_neurons_per_layer
+        first_in_layer_id += num_exc_neurons_per_layer
+
+    side_length = np.sqrt(n_in_layer_type)
+    if (side_length % 1 != 0):
+        raise RuntimeError("The number of neurons ber layer is not a square number: {}".format(n_in_layer_type))
+
+    id = first_in_layer_id + (column * side_length) + line
+
+    return id
+
+def get_side_length(n_in_layer_type):
+    side_length = np.sqrt(n_in_layer_type)
+    if (side_length % 1 != 0):
+        raise RuntimeError("The number of neurons ber layer is not a square number: {}".format(n_in_layer_type))
+    return int(side_length)
+
+def id_to_position_input(id, n_layer, side_length):
+    """
+    get input neuron coordinates
+    :param id: id of the neuron
+    :param n_layer: number of input layers
+    :param side_length: length of the input layer grid
+    :return: coordinates as (layer, y, x)
+    """
+    assert(id < 0)
+
+    id *= -1
+
+    n_per_layer = side_length ** 2
+
+    layer = id // n_per_layer
+
+    id_within_layer = id - (n_per_layer * layer)
+
+    x = id_within_layer // side_length
+    y = id_within_layer % side_length
+
+    return (layer, y, x)
+
+
+
+
+
+
 
 """
 Splits layer into excitatory and inhibitory neurons
@@ -85,6 +204,9 @@ it is agnostic about which neuron information is saved in the table (e.g. spike 
 Args:
     neuron_activity:  pandas data frame with a column "ids" 
     network_architecture_info: dictionary with the fields: num_exc_neurons_per_layer, num_inh_neurons_per_layer, num_layers
+    
+Returns:
+    list of data frames each with columsn ids and whater it was before. (ids are reduced to start with 0 in each layer)
 """
 def split_into_layers(neuron_activity, network_architecture_info):
     assert('ids' in neuron_activity)
@@ -155,3 +277,4 @@ def epoch_subfolders_to_tensor(all_epochs):
     :param all_epochs: nested list of shape [epoch][stimulus][layer][excitatory/inhibitory] -> pandas dataframe with "ids" and "firing_rates"
     :return: exc_rates,
     """
+    raise NotImplementedError("don't know what happend here")

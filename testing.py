@@ -172,4 +172,9 @@ def test_animated_hist():
     plt.show()
 
 
-bla = test_animated_hist()
+def test_network_loading():
+    net = data.load_network("/Users/clemens/Documents/Code/ModelClemens/output/11_01-14_22_synapses_extreme_high_e2i_count/initial", True,
+                       True)
+
+
+bla = test_network_loading()
