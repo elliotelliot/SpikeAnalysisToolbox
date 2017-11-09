@@ -5,6 +5,7 @@ from . import helper
 class Synapse_Mask:
     """
     Class that provides masks for a given network
+    Each function returns a boolean array that is true where the synapse is of the correct type
     """
     def __init__(self, network_architecture_info, synapses):
         self.n_exc = network_architecture_info["num_exc_neurons_per_layer"]
@@ -80,6 +81,7 @@ def multiple_connections_histogram(synapses):
 
 def neuron_stats_to_layer(neuron_info, input_layer_count, input_neurons_per_layer, network_info):
     """
+    Split synapse count information of neurons into layers. Pandas dataframe -> numpy array
 
     :param neuron_info: pandas dataframe with columns "ids", "synapse_count"
     :param input_layer_count: number of input layers (neurons with negative ids)
@@ -225,6 +227,16 @@ def receptive_field_of_neuron_input(pos, synapses, network_info, side_length, nu
     return receptive_field
 
 
+def get_weight_development_random_sample(synapses, n_synapses):
+    """
+    Get matrix with random sample of synapses
+    :param synapses: numpy array shape [epoch, synapse]
+    :param n_synapses: count of synapses to look at
+    :return: numpy array with dimensions [epoch, choosen_synapse] (choosen_synapse has size n_synapses)
+    """
+    n_epochs, n_possible_synapses = synapses.shape
+    rand_indices = np.random.choice(n_possible_synapses, size=(n_synapses,), replace=False)
+    return synapses[:, rand_indices]
 
 
 

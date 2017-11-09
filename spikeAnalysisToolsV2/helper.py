@@ -141,7 +141,7 @@ def position_to_id(pos, is_excitatory, network_info):
 def get_side_length(n_in_layer_type):
     side_length = np.sqrt(n_in_layer_type)
     if (side_length % 1 != 0):
-        raise RuntimeError("The number of neurons ber layer is not a square number: {}".format(n_in_layer_type))
+        raise RuntimeError("Tried to reshape something into square that wasn't actually a square number: {}".format(n_in_layer_type))
     return int(side_length)
 
 def id_to_position_input(id, n_layer, side_length):

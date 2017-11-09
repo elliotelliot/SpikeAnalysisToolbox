@@ -1,6 +1,10 @@
 import pandas as pd
 import numpy as np
 import csv
+from multiprocessing import Pool
+from functools import partial
+import os
+
 
 
 """
@@ -154,23 +158,23 @@ Returns:
     init_weights: list of synaptic weights (before training) only if initial_weights=True
     weights: list of synaptic weights after training
 """
-def load_network(pathtofolder, binaryfile, inital_weights):
+def load_network(pathtofolder, binaryfile, initial_weights):
     if pathtofolder[-1] != "/":
         pathtofolder += "/"
 
-    pre, post, delays, init_weights , weights = _raw_load_network(pathtofolder, binaryfile, inital_weights)
+    pre, post, delays, init_weights , weights = _raw_load_network(pathtofolder, binaryfile, initial_weights)
     data = dict(pre=pre, post=post, delays=delays, weights=weights)
-    if inital_weights:
+    if initial_weights:
         data['init_weights'] = init_weights
 
     return pd.DataFrame(data=data)
 
 
-def _raw_load_network(pathtofolder, binaryfile, inital_weights):
+def _raw_load_network(pathtofolder, binaryfile, initial_weights):
     pre = list()
     post = list()
     delays = list()
-    if inital_weights:
+    if initial_weights:
         init_weights = list()
     else:
         init_weights = None
@@ -186,7 +190,7 @@ def _raw_load_network(pathtofolder, binaryfile, inital_weights):
         delays = np.fromfile(pathtofolder +
                              'Synapses_NetworkDelays' + '.bin',
                              dtype=np.int32)
-        if inital_weights:
+        if initial_weights:
             init_weights = np.fromfile(pathtofolder + 'Synapses_NetworkWeights_Initial' + '.bin',
                                        dtype=np.float32)
         weights = np.fromfile(pathtofolder +
@@ -211,7 +215,7 @@ def _raw_load_network(pathtofolder, binaryfile, inital_weights):
             reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
             for row in reader:
                 delays.append(int(row[0]))
-        if inital_weights:
+        if initial_weights:
             with open(pathtofolder + 'Synapses_NetworkWeights_Initial.txt', 'r') as csvfile:
                 reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
                 for row in reader:
@@ -223,3 +227,40 @@ def _raw_load_network(pathtofolder, binaryfile, inital_weights):
                 weights.append(float(row[0]))
 
     return (pre, post, delays, init_weights, weights)
+
+def load_only_weights(pathtofolder, binaryfile=True):
+    if pathtofolder[-1] != "/":
+        pathtofolder += "/"
+
+    weights = np.fromfile(pathtofolder +
+                          'Synapses_NetworkWeights' + '.bin',
+                          dtype=np.float32)
+    return weights
+
+
+
+def load_weights_all_epochs(basic_path, epoch_indices, epoch_folder="testing", initial_folder_name="initial", binary=True, initial_weights=False):
+    """
+    Load weights for all epochs
+    :param basic_path: the top level folder containing the experiments result
+    :param epoch_indices: indices of the epochs to load. (Will look for folders ["epoch_folder/epoch{}".format(e) for e in epoch_indices]
+    :param epoch_folder: the name of the folder containing the folders "epochX". Whith each epoch folder containing a weights file.
+    :param initial_folder_name: name for the initial run (before training). The Network architecture will be loaded from here
+    :param binary: is it a binary file
+    :param initial_weights: (Deprecated)
+    :return: (full_network_initial, weights_all_epochs)
+        full_network_inital: pandas dataframe with columns: pre, post, delays, weights (of the inital state)
+        weights_all_epochs:  numpy array of shape [epoch, synapse] -> weight of that synapse at that epoch (epoch 0 is same weights as full_network_initial
+    """
+    if basic_path[-1] != "/":
+        basic_path += "/"
+
+    all_epoch_paths = [basic_path + epoch_folder + "/epoch{}".format(e) for e in epoch_indices]
+
+    full_network_initial = load_network(basic_path + initial_folder_name, binaryfile=binary, initial_weights=initial_weights)
+
+    weights_all_epochs = list(map(load_only_weights, all_epoch_paths))
+
+    weight_matrix = np.stack([full_network_initial.weights.values] + weights_all_epochs, axis=0)
+
+    return full_network_initial, weight_matrix

@@ -166,15 +166,82 @@ def test_animated_hist():
         network_architecture,
         info_times)
     print("Multiprocessing version took {}".format(timer() - start))
-    exc_information, inhibitory_information = info.information_all_epochs(rates_subfolders[0], object_indices, 3)
+    exc_information, inhibitory_information = info.single_cell_information_all_epochs(rates_subfolders[0], object_indices, 3)
     ani = spikeplot.plot_animated_histogram(exc_information)
     import matplotlib.pyplot as plt
     plt.show()
 
 
+def test_mutual_and_single_cell_info():
+    ## set the Masterpath to the folder where your output is saved
+    n_epochs = 188
+
+    masterpath = "/Users/clemens/Documents/Code/ModelClemens/output"
+    ## set the subfolder to the Simulation you want to analyse
+
+    subfolders = [
+        "11_05-20_04_loc1_both"
+    ]
+    ## if more than the inital epoch is needed *1 needs to be run
+    extensions = ["initial"]  # + ["testing/epoch180"]
+
+    object_list = data.load_testing_stimuli_info(
+        masterpath + "/" + subfolders[0])  # assuming all the subfolders have the same
+    n_stimuli = np.sum(obj['count'] for obj in object_list)
+
+    # info_neurons is just an array of the information from above. This makes it easier to run the functions and pass the information.
+    # info_times same for times
+    network_architecture = dict(
+        num_exc_neurons_per_layer=64 * 64,
+        num_inh_neurons_per_layer=32 * 32,
+        num_layers=4,
+        # total_per_layer = num_exc_neurons_per_layer + num_inh_neurons_per_layer,
+        # total_network = total_per_layer * num_layers,
+        # num_stimuli = 16
+    )
+
+    info_times = dict(
+        length_of_stimulus=2.0,
+        num_stimuli=n_stimuli,
+        time_start=1.5,
+        time_end=1.9
+    )
+
+    # objects_in_training = [
+    #     object_list[0]['indices'] + object_list[1]['indices'] + object_list[2]['indices'] + object_list[3]['indices'],
+    #     object_list[4]['indices'] + object_list[5]['indices'] + object_list[6]['indices'] + object_list[7]['indices'],
+    # ]
+    # # These Objects were bound together in training with temporal trace. so it should have learned information about them.
+    # print(objects_in_training)
+    object_indices = [obj['indices'] for obj in object_list]
+
+    spikes = data.load_spikes_from_subfolders(masterpath, subfolders, extensions, False)
+
+    rates_subfolders = firing.calculate_rates_subfolder(
+        spikes,
+        network_architecture,
+        info_times)
+    exh_mutual_info, inh_mutual_info = info.firing_rates_to_mutual_information(rates_subfolders[0][0], object_indices, 3, calc_inhibitory=True)
+    exc_single_cell, inh_single_cell = info.firing_rates_to_single_cell_information(rates_subfolders[0][0], object_indices, 3, calc_inhibitory=True)
+
+    assert(np.all(np.isclose(exh_mutual_info[0], np.mean(exc_single_cell, axis=0))))
+    assert(np.all(np.isclose(inh_mutual_info[0], np.mean(inh_single_cell, axis=0))))
+
+
+
+
+
 def test_network_loading():
-    net = data.load_network("/Users/clemens/Documents/Code/ModelClemens/output/11_01-14_22_synapses_extreme_high_e2i_count/initial", True,
-                       True)
+    path = "/Users/clemens/Documents/Code/ModelClemens/output/11_06-15_00_loc1_centered"
+    subfolder = ["initial"] + ["testing/epoch{}".format(e) for e in range(1, 30)]
+
+    start = timer()
+    net, weights = data.load_weights_all_epochs(path, range(1,30))
+    print("took {} ".format(timer() - start))
+
+    # test that the weights are always on the same position
+
+    return net, weights
 
 
-bla = test_network_loading()
+net, w = test_network_loading()

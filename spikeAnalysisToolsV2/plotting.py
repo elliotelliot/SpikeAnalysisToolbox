@@ -56,6 +56,82 @@ def plot_activity_in_layers(excitatory, inhibitory, value_range=None, item_label
         fig.colorbar(im, cax=cax)
 
 
+def animate_2d_matrix(data, perf, title, cmap='plasma'):
+    """
+    Animate a 2d matrix
+    :param data: numpy array of shape [frame, width, height]
+    :param perf: numpy array of shape [timepoints, layer] -> performace value
+    :param title: as string
+    :return:
+    """
+    if len(data.shape) == 2:
+        print("Data only has shape {}".format(data.shape))
+        n_epochs = data.shape[0]
+
+        side_length =  helper.get_side_length(data.shape[-1])
+        data = np.reshape(data, (n_epochs, side_length, side_length))
+        print("Data was reshaped into {}".format(data.shape))
+
+
+
+
+    n_timepoints, width, height = data.shape
+    _n_t, n_layers = perf.shape
+    epochs = np.arange(n_timepoints)
+    assert(n_timepoints == _n_t)
+
+    vextreme = np.max(np.abs(data))
+    vmax = vextreme
+
+    if(np.any(data<0)):
+        vmin = - vextreme
+        # we are plotting a difference so we want 0 to be in the middle
+    else:
+        vmin = np.min(data)
+        # we are not plotting a difference so we don't care where 0 is
+
+    # vmin= np.min(data)
+    # vmax = np.max(data)
+
+    fig = plt.figure(figsize=(10, 10))
+
+    ax = fig.add_subplot(1, 2, 1)
+    ax.set_title(title)
+    ax.axis('off')
+    # fig.colorbar(ax)
+    im = ax.imshow(data[0, :, :], animated=True, cmap=cmap, vmin=vmin, vmax=vmax)
+
+    cax = fig.add_axes([0.05, 0.1, 0.4, 0.05])
+    fig.colorbar(im, cax=cax, orientation='horizontal')
+
+
+
+    perfAx = fig.add_subplot(1,2,2)
+    pmin = np.min(perf)
+    pmax = np.max(perf)
+    prange = pmax-pmin
+
+    perfAx.set_ylim(pmin - 0.1*prange, pmax + 0.1*prange)
+    perfAx.set_xlim(epochs[0], epochs[-1])
+    layer_lines = [perfAx.plot(epochs[0], perf[0, l], label="layer {}".format(l)) for l in range(n_layers)]
+    perfAx.legend()
+
+    def update_perf(frame):
+        for l, layer_line in enumerate(layer_lines):
+            layer_line[0].set_data(epochs[:frame+1], perf[:frame+1, l])
+
+
+    def update(frame):
+        im.set_array(data[frame, :, :])
+        update_perf(frame)
+
+    ani = animation.FuncAnimation(fig, update, frames=n_timepoints, interval=500, blit=False, repeat_delay=22000)
+
+    return ani
+
+
+
+
 def animate_neuron_value_development(exc, inh):
     """
     Animate the development of a value per neuron
@@ -167,6 +243,46 @@ def plot_information_measure_advancement(before, after, n_to_plot = 1000, item_l
             layerAX.legend()
 
 
+def plot_ranked_neurons(list_of_things, title, n_to_plot=100, item_label=None, vmin=0.0):
+    """
+    Plot ranked neuron value. there will be as many subplots as layer. each contains as many lines as there are things
+    value of first line at x=5 is the value of the 5th best neuron (with respect to the first thing)
+    value of second line at x=5 is value of 5th best (with respect to the second thing) -> both values do NOT belong to the same neuron
+
+    :param title: name of the plot
+    :param list_of_things: np array of shape [n_things, layer, neuron]
+    :param n_to_plot: how many neurons to plot
+    :param item_label: list of strings that name the things (optional)
+    :return:
+    """
+    n_things, n_layer, n_neurons = list_of_things.shape
+
+    if not item_label:
+        item_label = ["Thing Nr. {}".format(t) for t in range(n_things)]
+    else:
+        assert(len(item_label) == n_things)
+
+    sorted_stuff = np.sort(list_of_things, axis=2)
+
+    vmax = np.max(sorted_stuff)
+
+
+    fig = plt.figure(figsize=(15, 8))
+    fig.suptitle(title, fontsize=16)
+
+
+    for layer in range(n_layer):
+        layerAX  = fig.add_subplot(1, n_layer, layer + 1)
+        layerAX.set_title("Layer {}".format(layer))
+        layerAX.set_xlabel("Neuron Rank")
+        layerAX.set_ylim(vmin, 0.1 * (vmax-vmin) + vmax)
+        for i, item in enumerate(item_label):
+            layerAX.plot(sorted_stuff[i, layer, :-n_to_plot-1:-1], label=item)
+
+        layerAX.legend()
+
+
+
 
 def plot_information_difference_development(info, threshold):
     """
@@ -211,19 +327,35 @@ def plot_information_difference_development(info, threshold):
     axAvg.legend()
     axN_neurons.legend()
 
-def plot_information_development(info, threshold, item_label=None):
+def plot_information_development(info, epochs=None, mean_of_top_n = 'all', threshold=0.8, item_label=None, lower_y_lim=0):
     """
     plot how the information developed
     :param info: np array of shape [epochs, objects, layer, neuron_id]
     :return:
     """
+    if len(info.shape) != 4:
+        info = np.expand_dims(info, axis=1)
+        # The case that we have an information score that does not have one value for each item but a combined value
+        item_label = ["combined value"]
+
     n_epochs, n_objects, n_layer, n_neurons = info.shape
+    if epochs==None:
+        epochs=np.arange(n_epochs)
+
+    if type(epochs) != list and type(epochs) != np.ndarray:
+        epochs = list(epochs)
+
     if not item_label:
         item_label = list(range(n_objects))
     else:
         assert(len(item_label) == n_objects)
 
-    avg_info = np.mean(info, axis=3)
+    if mean_of_top_n == 'all':
+        avg_info = np.mean(info, axis=3)
+    else:
+        info_top_n = np.sort(info, axis=3)[:, :, :, -1-mean_of_top_n:]
+        avg_info = np.mean(info_top_n, axis=3)
+
     avg_max = np.max(avg_info)
 
     n_above_threshold = np.count_nonzero( (info >= threshold), axis=3 )
@@ -235,8 +367,8 @@ def plot_information_development(info, threshold, item_label=None):
     for i, item in enumerate(item_label):
 
         axAvg  = fig.add_subplot(2, n_objects, i + 1)
-        axAvg.set_ylim(0, 1.1 * avg_max)
-        axAvg.set_title("Average info for Item {}".format(item))
+        axAvg.set_ylim(lower_y_lim, 1.1 * avg_max)
+        axAvg.set_title("Average info of top {} neurons for Item {}".format(mean_of_top_n, item))
 
 
         axN_neurons = fig.add_subplot(2, n_objects, n_objects + i + 1)
@@ -246,7 +378,7 @@ def plot_information_development(info, threshold, item_label=None):
         for l in range(n_layer):
 
             axAvg.plot(avg_info[:, i, l], label= "Layer {}".format(l))
-            axN_neurons.plot(n_above_threshold[:, i, l], label="Layer {}".format(l))
+            axN_neurons.plot(epochs, n_above_threshold[:, i, l], label="Layer {}".format(l))
 
         axAvg.legend()
         axN_neurons.legend()

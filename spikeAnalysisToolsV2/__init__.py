@@ -1,0 +1,1 @@
+default_network_architecture = dict(num_inh_neurons_per_layer= 32*32, num_exc_neurons_per_layer= 64*64, num_layers=4)
