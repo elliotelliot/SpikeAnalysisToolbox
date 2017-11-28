@@ -56,6 +56,10 @@ class Synapse_Mask:
         post_below_first_in_next_layer = self.post < (self.post_layers+1) * self.total_per_layer
         return post_above_first_inh & post_below_first_in_next_layer
 
+    def post_in_layer(self, l):
+        return self.post_layers == l
+
+
 
 
 def count_incoming_with_mask(synapses, mask):
@@ -121,6 +125,74 @@ def neuron_stats_to_layer(neuron_info, input_layer_count, input_neurons_per_laye
         inh_collector[l_id, inh.ids] = inh.synapse_count.values
 
     return input_collector, exc_collector, inh_collector
+
+
+def weighted_presynaptic_actvity(mask, net, weights, firing_rates):
+    """
+    Calculates the sum over (presynaptic_FR * synapse_weight) for all synapses masked with 'mask'
+    :param mask: np boolean array to select the synapses
+    :param net: pandas dataframe with columns 'pre', 'post'
+    :param weights: np array of shape [epochs, synapses] -> weight for that synapse at that epoch
+    :param firing_rates: (exc_rates, inh_rates) -> each a numpy array of shape [epochs, objects, layer, neuron_id]
+    :return: numpy array of length [n_epochs, object] -> weighted sum of presynaptic firing rates within each object
+    """
+
+    if not np.any(mask):
+        raise ValueError("The mask is completely False (every entry is false)")
+
+    exc_rates, inh_rates = firing_rates
+
+    n_epochs, n_objects, n_layer, n_neurons_exc = exc_rates.shape
+    assert((n_epochs, n_objects, n_layer) == inh_rates.shape[:3])
+    n_neurons_inh = inh_rates.shape[-1]
+
+    network_info = dict(
+        num_exc_neurons_per_layer=n_neurons_exc,
+        num_inh_neurons_per_layer=n_neurons_inh,
+        num_layers=n_layer
+    )
+
+    pre_ids = net[mask].pre
+    if(np.any(pre_ids < 0 )):
+        raise ValueError("Some of the presynaptic neurons are input neurons. This would require a seperate function.")
+
+    assert(len(pre_ids.shape) == 1)
+
+    neuron_info = [helper.id_to_position(pre_id, network_info, pos_as_2d=False) for pre_id in pre_ids]
+    # each entry has shape (is_excitatory, (layer, pos))
+
+    is_excitatory, position = zip(*neuron_info)
+
+    if np.all(is_excitatory):
+        relevant_rates = exc_rates
+    elif np.all(np.invert(is_excitatory)):
+        relevant_rates = inh_rates
+    else:
+        raise ValueError("There are excitatory and inhibitory presynaptic neurons. Blindly summing over them does not seem to make sense")
+
+    layer_id, neuron_id = zip(*position)
+
+
+    presynaptic_firing_rates = relevant_rates[:, :, layer_id, neuron_id]
+
+    weights = weights[:, mask]
+
+    assert(presynaptic_firing_rates.shape[-1] == weights.shape[-1])
+    assert(presynaptic_firing_rates.shape[0] == weights.shape[0])
+    # but in presynaptic_firing_rates the second dimension is different (objects)
+    # weights are the same for different object presentations (within epoch)
+    weights_reshaped = np.repeat(np.expand_dims(weights, 1), n_objects, axis=1)
+
+
+    weighted_fr = weights_reshaped * presynaptic_firing_rates
+
+
+    return np.sum(weighted_fr, axis=2)
+
+
+
+
+
 
 
 def receptive_field_of_neuron(pos, is_excitatory, synapses, network_info):

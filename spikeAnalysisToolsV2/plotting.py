@@ -4,7 +4,7 @@ import matplotlib.animation as animation
 from . import helper
 
 
-def plot_activity_in_layers(excitatory, inhibitory, value_range=None, item_labels=None, cmap='plasma'):
+def show_activity_in_layers(excitatory, inhibitory, value_range=None, item_labels=None, cmap='plasma'):
     """
     Plot activity or information for all items in the network. items can be stimuli or objects for example
     :param excitatory: values for excitatory neurons to be plotted, shape [item, layer, neuron_id]
@@ -56,7 +56,7 @@ def plot_activity_in_layers(excitatory, inhibitory, value_range=None, item_label
         fig.colorbar(im, cax=cax)
 
 
-def animate_2d_matrix(data, perf, title, cmap='plasma'):
+def animate_2d_matrix(data, perf, title, label_perf=None, cmap='plasma'):
     """
     Animate a 2d matrix
     :param data: numpy array of shape [frame, width, height]
@@ -75,10 +75,16 @@ def animate_2d_matrix(data, perf, title, cmap='plasma'):
 
 
 
+
     n_timepoints, width, height = data.shape
-    _n_t, n_layers = perf.shape
+    _n_t, n_perf_measures = perf.shape
     epochs = np.arange(n_timepoints)
     assert(n_timepoints == _n_t)
+
+    if label_perf is None:
+        label_perf = ["Layer {}".format(l) for l in range(n_perf_measures)]
+    else:
+        assert(len(label_perf) == n_perf_measures)
 
     vextreme = np.max(np.abs(data))
     vmax = vextreme
@@ -113,7 +119,7 @@ def animate_2d_matrix(data, perf, title, cmap='plasma'):
 
     perfAx.set_ylim(pmin - 0.1*prange, pmax + 0.1*prange)
     perfAx.set_xlim(epochs[0], epochs[-1])
-    layer_lines = [perfAx.plot(epochs[0], perf[0, l], label="layer {}".format(l)) for l in range(n_layers)]
+    layer_lines = [perfAx.plot(epochs[0], perf[0, l], label=label_perf[l]) for l in range(n_perf_measures)]
     perfAx.legend()
 
     def update_perf(frame):
@@ -177,7 +183,7 @@ def animate_neuron_value_development(exc, inh):
     ani = animation.ArtistAnimation(fig, ims, interval=200, blit=True, repeat_delay=22000)
     return ani
 
-def plot_values_all_layer(values, figure_title, cmap='plasma'):
+def show_values_all_layer(values, figure_title, cmap='plasma'):
     """
     Plot the values for all layers collor coded
     :param values: np array of shape [layer, neuron_id] or [layer, lines, columns]
@@ -299,24 +305,25 @@ def plot_information_difference_development(info, threshold):
 
     avg_info_1_minus_0 = avg_info[:, 1, :] - avg_info[:, 0, :]
 
-    avg_max = np.max(avg_info)
+    avg_max = np.max(avg_info_1_minus_0)
 
     n_above_threshold = np.count_nonzero( (info >= threshold), axis=3 )
-    max_n_above_threshold = np.max(n_above_threshold)
+
 
     above_max_1_minus_0 = n_above_threshold[:, 1, :] - n_above_threshold[:, 0, :]
+    max_n_above_threshold = np.max(above_max_1_minus_0)
 
     fig = plt.figure(figsize=(18, 8))
     fig.suptitle("Development of the difference in information", fontsize=16)
 
 
     axAvg  = fig.add_subplot(1, 2, 1)
-    axAvg.set_ylim(0, 1.1 * avg_max)
+    axAvg.set_ylim(-1.1 * avg_max, 1.1 * avg_max)
     axAvg.set_title("Average info for stimulus 1 - avg info for stimulus 0")
 
 
     axN_neurons = fig.add_subplot(1, 2, 2)
-    axN_neurons.set_ylim(0, 1.1 * max_n_above_threshold)
+    axN_neurons.set_ylim(-1.1 * max_n_above_threshold, 1.1 * max_n_above_threshold)
     axN_neurons.set_title("Number of neurons above {}".format(threshold))
 
     for l in range(n_layer):
@@ -432,7 +439,7 @@ def plot_firing_rates_std_vs_mean_colored_by_object(firing_rates, object_list, t
     ax.legend()
 
 
-def plot_animated_histogram(data, n_bins=10, item_label=None, log=True):
+def animated_histogram(data, n_bins=10, item_label=None, log=True):
     """
     Plot animated histograms of the data, one frame for each epoch
 
@@ -473,7 +480,38 @@ def plot_animated_histogram(data, n_bins=10, item_label=None, log=True):
     return ani
 
 
-def plot_connection_fields(synapses, layer, is_excitatory, neuron_positions, network_architecture, mode='sources'):
+def plot_development_for_object(values, title, object_labels=None):
+    """
+    Plot the development of an arbitrary measure seperatly for each neuron
+    :param values: numpy array of shape [epoch, object, layer]
+    :param title: string with title for the figure
+    :param object_labels: optional object label
+    :return:
+    """
+    n_epochs, n_objects, n_layer = values.shape
+
+    if object_labels is None:
+        object_labels = ['Obj {}'.format(o) for o in range(n_objects)]
+    else:
+        assert(n_objects == len(object_labels))
+
+
+    fig = plt.figure(figsize=(15,8))
+    fig.suptitle(title)
+
+    for obj_id, obj_name in enumerate(object_labels):
+        ax = fig.add_subplot(1, n_objects, obj_id+1)
+        ax.set_title(obj_name)
+        for l in range(n_layer):
+            ax.plot(values[:, obj_id, l], label="Layer {}".format(l))
+
+    ax.legend()
+
+
+
+
+
+def show_connection_fields(synapses, layer, is_excitatory, neuron_positions, network_architecture, mode='sources'):
     """
 
     :param synapses:

@@ -19,7 +19,7 @@ def min_response_to_one_transform(firing_rates, objects):
    :return: exh_min_objects, inh_min_objects the minimal response of a neuron to 'the minimally responsive transform of the object'
    shape [objectID, layer, neuronID]
    """
-   exc_rates, inh_rates = helper.stimulus_layer_nested_list_2_numpy_tensor(firing_rates)
+   exc_rates, inh_rates = helper.nested_list_of_stimuli_2_np(firing_rates)
 
    z_exh = helper.z_transform(exc_rates)
    z_inh = helper.z_transform(inh_rates)
@@ -44,7 +44,7 @@ def t_test_p_value(firing_rates, objects):
     if len(objects) != 2:
         raise ValueError("Can only work for two objects.")
 
-    exc_rates, inh_rates = helper.stimulus_layer_nested_list_2_numpy_tensor(firing_rates)
+    exc_rates, inh_rates = helper.nested_list_of_stimuli_2_np(firing_rates)
 
     result = tuple()
 
@@ -89,7 +89,7 @@ def average_higher_z_response_to_object(firing_rates, objects, min_difference=0.
    :return: exh, inh: number of std by which the neuron response higher to object objectID
    shape [objectID, layer, neuronID]
     """
-    exc_rates, inh_rates = helper.stimulus_layer_nested_list_2_numpy_tensor(firing_rates)
+    exc_rates, inh_rates = helper.nested_list_of_stimuli_2_np(firing_rates)
 
     z_exh = helper.z_transform(exc_rates)
     z_inh = helper.z_transform(inh_rates)
@@ -108,7 +108,7 @@ def average_higher_z_response_to_object(firing_rates, objects, min_difference=0.
 
 
 
-def mutuall_information(freq_table):
+def mutual_information(freq_table):
     """
     Calculate mutual information between response and stimulus for each neuron. Assumes a flat prior for the stimuli
 
@@ -146,15 +146,15 @@ def firing_rates_to_mutual_information(firing_rates, objects, n_bins, calc_inhib
     :param calc_inhibitory: Flag (to save time)
     :return:
     """
-    exc_rates, inh_rates = helper.stimulus_layer_nested_list_2_numpy_tensor(firing_rates)
+    exc_rates, inh_rates = helper.nested_list_of_stimuli_2_np(firing_rates)
 
     exc_table = combine.response_freq_table(exc_rates, objects, n_bins=n_bins)
 
-    exc_info = mutuall_information(exc_table)
+    exc_info = mutual_information(exc_table)
 
     if calc_inhibitory:
         inh_table = combine.response_freq_table(inh_rates, objects, n_bins=n_bins)
-        inh_info = mutuall_information(inh_table)
+        inh_info = mutual_information(inh_table)
     else:
         inh_info = None
 
@@ -199,8 +199,7 @@ def firing_rates_to_single_cell_information(firing_rates, objects, n_bins, calc_
    :param calc_inhibitory: Flag (to save time)
    :return:
    """
-   exc_rates, inh_rates = helper.stimulus_layer_nested_list_2_numpy_tensor(firing_rates)
-
+   exc_rates, inh_rates = helper.nested_list_of_stimuli_2_np(firing_rates)
    exc_table = combine.response_freq_table(exc_rates, objects, n_bins=n_bins)
 
    exc_info = single_cell_information(exc_table)
@@ -268,7 +267,14 @@ def _multiprocess_apply_along_all_epochs(firing_rates_all_epochs, caller):
     worker_pool = Pool(processes=5) # global worker pool
 
 
+    if False:
+        exc_inh_info = map(caller, firing_rates_all_epochs)
+        raise RuntimeError("The mapping worked so we should go here in debugging")
+
     exc_inh_info = worker_pool.map(caller, firing_rates_all_epochs)
+
+    worker_pool.close()
+    worker_pool.join()
 
     exc_info_fast, inh_info_fast = zip(*exc_inh_info)
 
@@ -309,6 +315,9 @@ def slow_information_all_epochs(firing_rates_all_epochs, objects, n_bins, calc_i
     # assert(np.all(exc_np == exc_np_fast))
 
     return exc_np, inh_np
+
+
+# TODO refactor Caller, such that it first makes the numpy tensor, then applyies some normalisation then calls the information measures for exc (and maybe inhibitory)
 
 class Caller(object):
     def __init__(self, function, **kwargs):

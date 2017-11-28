@@ -200,6 +200,8 @@ def calculate_rates_subfolder(spikes_for_folder, info_neurons, info_times):
 
         subfolder_rates.append(extension_rates_pro)
 
+    worker_pool.close()
+    worker_pool.join()
     return subfolder_rates
 
 def slow_calculate_rates_subfolder(spikes_for_folder, info_neurons, info_times):
@@ -286,7 +288,7 @@ def digitize_firing_rates_with_equispaced_bins(firing_rates, n_bins):
     n_stimuli, n_layer, n_neurons = firing_rates.shape
 
     minimal_response = np.min(firing_rates, axis=0)
-    maximal_response = np.max(firing_rates, axis=0) + 1 # +1 cause the last one is <
+    maximal_response = np.max(firing_rates, axis=0) + 1 # + 1 cause the last one is <
 
     categorized_firing_rates = np.empty((n_stimuli, n_layer, n_neurons), dtype=int)
 
@@ -300,6 +302,20 @@ def digitize_firing_rates_with_equispaced_bins(firing_rates, n_bins):
     # assert(not np.any((categorized_firing_rates.flatten() >= n_bins)))
 
     return categorized_firing_rates
+
+
+def inplace_normailize_mean_per_stimulus(firing_rates):
+    """
+    Remove mean in layer for each layer in each stimulus in each epoch
+    :param firing_rates: nested list of shape [extension(epoch)][stimulus][layer][exc/inh] -> pandas dataframe with columns 'ids', and 'firing_rates'
+    :return: firing_rates of excactly the same shape, but the pandas dataframes all have mean 0 now
+    """
+    for extension in firing_rates:
+        for stimulus in extension:
+            for layer in stimulus:
+                for neuron_type_fr in layer:
+                    mean = neuron_type_fr.firing_rates.mean()
+                    neuron_type_fr.firing_rates -= mean
 
 
 class Caller(object):

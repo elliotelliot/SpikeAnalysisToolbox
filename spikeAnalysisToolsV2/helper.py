@@ -34,10 +34,10 @@ Args:
 
 Returns: 
     (excitatory, inhibitory) 
-    each is a numpy array of shape [stimulus, layer, neuron_id] -> integer firing rate
+    each is a numpy array of shape [stimulus, layer, neuron_id] -> firing rate value
 
 """
-def stimulus_layer_nested_list_2_numpy_tensor(all_stimuli_rates):
+def nested_list_of_stimuli_2_np(all_stimuli_rates):
     n_stimuli = len(all_stimuli_rates)
     n_layer = len(all_stimuli_rates[0])
     n_neurons_exc = len(all_stimuli_rates[0][0][0])
@@ -51,6 +51,20 @@ def stimulus_layer_nested_list_2_numpy_tensor(all_stimuli_rates):
             inhibitory_rates[stimulus, layer, :] = all_stimuli_rates[stimulus][layer][1].sort_values('ids').firing_rates
 
     return excitatory_rates, inhibitory_rates
+
+
+def nested_list_of_epochs_2_np(all_epoch_rates):
+    """
+    Convert nested list to two numpy arrays
+    :param all_epoch_rates: nestd list of shape [epoch][stimulus][layer][exc/inh] -> pandas dataframe with fields "ids" firing_rate
+    :return: exc, inh - each a numpy array of shape [epoch, stimulus, layer, nueron_id] -> firing rate value
+    """
+    list_of_np_arrays = [nested_list_of_stimuli_2_np(epoch) for epoch in all_epoch_rates]
+    exc, inh = zip(*list_of_np_arrays)
+    # they are wrong now
+    exc_np = np.concatenate([np.expand_dims(e, 0) for e in exc], axis=0)
+    inh_np = np.concatenate([np.expand_dims(i, 0) for i in inh], axis=0)
+    return exc_np, inh_np
 
 
 def neuron_target_column_to_numpy_array(data, target_column, network_architecture):
@@ -76,11 +90,15 @@ def neuron_target_column_to_numpy_array(data, target_column, network_architectur
 
     return result_exc, result_inh
 
-def id_to_position(id, network_info):
+
+
+def id_to_position(id, network_info, pos_as_2d=True):
     """
     given the id of a neuron it calculates its coordinates in the network
-    :param id:
-    :return: is_it_excitatory? , tuple with position of neuron [layer, row, column]
+    :param id: global id of the neuron
+    :param network_info: usual dict
+    :param pos_as_2d: if True returned position is tuple [layer, row, column] if False tuple [layer, neuron_id]
+    :return: is_it_excitatory? , tuple with position of neuron [layer, row, column] or [layer, neuron_id]
     """
     num_exc_neurons_per_layer = network_info["num_exc_neurons_per_layer"]
     num_inh_neurons_per_layer = network_info["num_inh_neurons_per_layer"]
@@ -97,26 +115,66 @@ def id_to_position(id, network_info):
         n_in_layer_type = num_inh_neurons_per_layer
         id_within_layer -= num_exc_neurons_per_layer
 
-    side_length = np.sqrt(n_in_layer_type)
-    if (side_length % 1 != 0):
-        raise RuntimeError("The number of neurons ber layer is not a square number: {}".format(n_in_layer_type))
+    if pos_as_2d:
+        side_length = get_side_length(n_in_layer_type)
 
-    x = id_within_layer // side_length
-    y = id_within_layer % side_length
+        x = id_within_layer // side_length
+        y = id_within_layer % side_length
+
+        return exc_neuron, (int(layer), int(y), int(x))
+    else:
+        return exc_neuron, (int(layer), int(id_within_layer))
 
 
-    return exc_neuron, (int(layer), int(y), int(x))
+def id_within_layer_to_pos(id, network_info, exc_neuron=True):
+    """
+    Calculate position of neuron with its layer
+    :param id: tuple of shape (layer, neuron_id) or neuron_id (as int)
+    :param network_info: usual dict
+    :return: tupple of shape: (layer, row, column) or (row, column)
+    """
+    if len(id) == 2:
+        neuron_id = id[1]
+        layer = (id[0],)
+    else:
+        layer, neuron_id = tuple(), id
+
+    num_exc_neurons_per_layer = network_info["num_exc_neurons_per_layer"]
+    num_inh_neurons_per_layer = network_info["num_inh_neurons_per_layer"]
+
+    if exc_neuron:
+        n_in_layer_typ = num_exc_neurons_per_layer
+    else:
+        n_in_layer_typ = num_inh_neurons_per_layer
+
+    side_length = get_side_length(n_in_layer_typ)
+
+    x = neuron_id // side_length
+    y = neuron_id % side_length
+
+    result = (int(y), int(x))
+
+    return layer + result
+
+
+
 
 
 def position_to_id(pos, is_excitatory, network_info):
     """
     Calculate receptive field of a neuron
-    :param pos: position of the neuron as a tuple [layer, line, column]
+    :param pos: position of the neuron as a tuple [layer, line, column], or [layer, id_within_layer]
     :param is_excitatory: True -> excitatory neuron, False -> inhibitory neuron
     :param network_info: usual dict
     :return id: overall id of the neuron
     """
-    layer, line, column = pos
+    if len(pos) == 3:
+        layer, line, column = pos
+        neuron_id = None # we cant calculate the neuron_id without knowing which layer type it is
+    elif len(pos) == 2:
+        layer, neuron_id = pos
+    else:
+        raise ValueError("pos does not have the right shape (tupple of length 2 or 3")
 
     num_exc_neurons_per_layer = network_info["num_exc_neurons_per_layer"]
     num_inh_neurons_per_layer = network_info["num_inh_neurons_per_layer"]
@@ -131,10 +189,14 @@ def position_to_id(pos, is_excitatory, network_info):
         first_in_layer_id += num_exc_neurons_per_layer
 
     side_length = np.sqrt(n_in_layer_type)
+
+    if neuron_id is None:
+        neuron_id = (column * side_length) + line
+
     if (side_length % 1 != 0):
         raise RuntimeError("The number of neurons ber layer is not a square number: {}".format(n_in_layer_type))
 
-    id = first_in_layer_id + (column * side_length) + line
+    id = first_in_layer_id + neuron_id
 
     return id
 

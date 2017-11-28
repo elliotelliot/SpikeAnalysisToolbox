@@ -115,31 +115,6 @@ def load_spikes_from_subfolders(masterpath, subfolders, extensions, input_layer)
     return all_subfolders
 
 
-def load_testing_stimuli_info(experiment_folder):
-    """
-    load the information about the stimuli presented during testing. There is assumed to be a file "testing_list.txt" with the information in the experiment_folder
-    :param experiment_folder: top level folder of the experiment
-    :return:
-    """
-    objects = []
-    current_object = {'count': 0, 'elements': set(), 'indices': list()}
-    current_stim_index = 0
-    with open(experiment_folder + "/testing_list.txt", "r") as file:
-        for line in file:
-            raw_text = line.strip()
-            if raw_text == "*":
-                # make new object
-                objects.append(current_object)
-                current_object = {'count': 0, 'elements': set(), 'indices': list()}
-            else:
-                current_object['elements'].add(raw_text)
-                current_object['count'] += 1
-                current_object['indices'] += [current_stim_index]
-                current_stim_index += 1
-    objects.append(current_object)
-
-    proper_objects = [obj for obj in objects if obj['count'] != 0]
-    return proper_objects
 
 
 """
@@ -264,3 +239,65 @@ def load_weights_all_epochs(basic_path, epoch_indices, epoch_folder="testing", i
     weight_matrix = np.stack([full_network_initial.weights.values] + weights_all_epochs, axis=0)
 
     return full_network_initial, weight_matrix
+
+
+def load_stimulus_file_to_attribute_matrix(filename, attributes):
+    """
+    reads stimulus names from file and translates them to a matrix of attribute values
+
+    :param filename: name of file
+    :param attributes: list of dicts -> pos_in_stim, and an entry for each possible value of that letter in the stimulus names. the first dictonary in this list will be in the first place in the resulting matrix
+    :return:
+    """
+    import numpy as np
+    stimuli_collector = list()
+
+    with open(filename, "r") as file:
+        for line in file:
+            raw_text = line.strip()
+            if raw_text != "*":
+                assert(len(raw_text)==len(attributes))
+
+                this_stimulus = -1 * np.ones((1, len(attributes)))
+
+                for atr_id, atr in enumerate(attributes):
+                    letter = raw_text[atr["pos_in_stim"]]
+                    atr_value = atr[letter]
+
+                    this_stimulus[0, atr_id] = atr_value
+
+                stimuli_collector.append(this_stimulus)
+
+    matrix = np.concatenate(stimuli_collector, axis=0)
+    assert(np.all(matrix != -1))
+
+    return matrix
+
+
+
+
+def load_testing_stimuli_info(experiment_folder):
+    """
+    load the information about the stimuli presented during testing. There is assumed to be a file "testing_list.txt" with the information in the experiment_folder
+    :param experiment_folder: top level folder of the experiment
+    :return:
+    """
+    objects = []
+    current_object = {'count': 0, 'elements': set(), 'indices': list()}
+    current_stim_index = 0
+    with open(experiment_folder + "/testing_list.txt", "r") as file:
+        for line in file:
+            raw_text = line.strip()
+            if raw_text == "*":
+                # make new object
+                objects.append(current_object)
+                current_object = {'count': 0, 'elements': set(), 'indices': list()}
+            else:
+                current_object['elements'].add(raw_text)
+                current_object['count'] += 1
+                current_object['indices'] += [current_stim_index]
+                current_stim_index += 1
+    objects.append(current_object)
+
+    proper_objects = [obj for obj in objects if obj['count'] != 0]
+    return proper_objects

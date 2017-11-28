@@ -3,7 +3,7 @@ from numba import jit
 
 from . import firing_rates as firing
 
-def average_responses(responses, list_of_objects):
+def old_average_response(responses, list_of_objects):
     """
     Combine Stimuli by averaging the responses with a flat prior
     :param response: numpy array of dimensions [stimulus, layer, neuron_id]
@@ -13,13 +13,33 @@ def average_responses(responses, list_of_objects):
     prev_shape = responses.shape
     new_shape = (len(list_of_objects),) + prev_shape[1:]
 
-
     object_responses = np.empty(new_shape)
 
     for i, object in enumerate(list_of_objects):
         object_responses[i, :, :] = np.mean(responses[object, :, :], axis=0)
 
     return object_responses
+
+def average_responses(responses, list_of_objects, axis=0):
+    """
+    Combine Stimuli by averaging the responses with a flat prior
+    :param response: numpy array of dimensions [stimulus, layer, neuron_id]
+    :param list_of_objects: list of lists containing the ids of stimuli that belong to one object [objectID]->list of stimulus ids
+    :param axis: index of axis along which the objects are
+    :return: numpy array of shape [objects, layer, neuron_ID] -> average response of neuron for the OBJECT
+    """
+    # prev_shape = responses.shape
+    # new_shape = prev_shape
+    # new_shape[axis] = len(list_of_objects)
+    assert(responses.shape[axis] == np.sum([len(obj) for obj in list_of_objects]))
+
+    object_responses = list()
+
+    for i, object in enumerate(list_of_objects):
+        object_response = np.mean(np.take(responses, object, axis=axis), axis=axis)
+        object_responses.append(np.expand_dims(object_response, axis=axis))
+
+    return np.concatenate(object_responses, axis=axis)
 
 def min_responses(responses, list_of_objects):
     """
@@ -44,6 +64,7 @@ def min_responses(responses, list_of_objects):
     object_responses[object_responses < 0] = 0
 
     return object_responses
+
 
 
 @jit(cache=True)

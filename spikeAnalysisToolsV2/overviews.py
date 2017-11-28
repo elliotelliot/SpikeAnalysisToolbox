@@ -23,7 +23,7 @@ def print_firing_rates_tables(subfolder_firing_rates, info_times, subfolders, ex
         print(subfolders[subfolder])
         for ext_index in range(len(extensions)):
 
-            exc_firing_rates_tensor, inh_firing_rates_tensor = helper.stimulus_layer_nested_list_2_numpy_tensor(subfolder_firing_rates[subfolder][ext_index])
+            exc_firing_rates_tensor, inh_firing_rates_tensor = helper.nested_list_of_stimuli_2_np(subfolder_firing_rates[subfolder][ext_index])
             # have dimensions [stimulus, layer, neuronid]
 
 

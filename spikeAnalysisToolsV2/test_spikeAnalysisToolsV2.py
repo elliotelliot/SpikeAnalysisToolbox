@@ -73,7 +73,7 @@ class Test_combine_stimuli(unittest.TestCase):
         firing_rates = firing.calculate_rates_subfolder(spikes, network_architecture, info_times)
 
         rates = firing_rates[0][0]
-        exc_rates, inh_rates = helper.stimulus_layer_nested_list_2_numpy_tensor(rates)
+        exc_rates, inh_rates = helper.nested_list_of_stimuli_2_np(rates)
 
         objects = [[0,1,2,3,8,9,10,11], [4,5,6,7,12,13,14,15]]  # each is presented twice
 

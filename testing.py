@@ -22,6 +22,7 @@ import spikeAnalysisToolsV2.overviews as overview
 import spikeAnalysisToolsV2.combine_stimuli as combine
 import spikeAnalysisToolsV2.plotting as spikeplot
 import spikeAnalysisToolsV2.information_scores as info
+import spikeAnalysisToolsV2.synapse_analysis as synapses
 
 
 
@@ -105,7 +106,7 @@ def test_functional_freq_table():
         info_times)
     final_epoch_rates = rates_subfolders[0][1]
     objects = [[0, 1, 2, 3, 8, 9, 10, 11], [4, 5, 6, 7, 12, 13, 14, 15]]  # each is presented twice
-    exc_rates, inh_rates = helper.stimulus_layer_nested_list_2_numpy_tensor(final_epoch_rates)
+    exc_rates, inh_rates = helper.nested_list_of_stimuli_2_np(final_epoch_rates)
     freq_table =  combine.response_freq_table(exc_rates, objects)
     single_cell_info = info.single_cell_information(freq_table)
     return single_cell_info
@@ -243,5 +244,53 @@ def test_network_loading():
 
     return net, weights
 
+def test_weighted_presynaptic_firing_rates():
+    path = "/Users/clemens/Documents/Code/ModelClemens/output/"
+    subfolders = ["11_06-15_00_loc1_centered"]
+    extensions = ["initial"] + ["testing/epoch{}".format(e) for e in range(1, 30)]
 
-net, w = test_network_loading()
+    net, weights = data.load_weights_all_epochs(path+subfolders[0], range(1,30))
+
+    object_list = data.load_testing_stimuli_info(path+subfolders[0])  # assuming all the subfolders have the same
+    n_stimuli = np.sum(obj['count'] for obj in object_list)
+    object_indices = [obj['indices'] for obj in object_list]
+
+    network_architecture = dict(
+        num_exc_neurons_per_layer=64 * 64,
+        num_inh_neurons_per_layer=32 * 32,
+        num_layers=4
+    )
+
+    info_times = dict(
+        length_of_stimulus=2.0,
+        num_stimuli=n_stimuli,
+        time_start=1.5,
+        time_end=1.9
+    )
+
+    spikes = data.load_spikes_from_subfolders(path, subfolders, extensions, False)
+
+    rates_subfolders = firing.calculate_rates_subfolder(
+        spikes,
+        network_architecture,
+        info_times)
+
+    exc_rates, inh_rates = helper.nested_list_of_epochs_2_np(rates_subfolders[0])
+
+    mymask = synapses.Synapse_Mask(network_architecture, net)
+
+    neuron_id = 5939
+
+    excitatory_mask = np.invert(mymask.inh_lateral())
+
+    overall_mask = excitatory_mask & (net.post.values == neuron_id)
+
+    weighted_current = synapses.weighted_presynaptic_actvity(overall_mask, net=net, weights=weights, firing_rates=(exc_rates, inh_rates))
+
+    return weighted_current
+
+
+
+
+wc = test_weighted_presynaptic_firing_rates()
+# net, w = test_network_loading()

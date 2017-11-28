@@ -163,7 +163,10 @@ def folder_info_analysis(masterpath, subfolder, extension, neuronstart, neuronen
     for n in range(num_stimuli):
         # Individually remove the means
         rates[n] -= np.mean(rates[n]) # mean of all neurons within that stimulus
+        
     neuronmeans = np.mean(np.asarray(rates), axis=0)
+
+    assert(np.all(np.isclose(neuronmeans, 0)))
 
     for n in range(num_stimuli):
         rates[n] -= neuronmeans
@@ -172,7 +175,8 @@ def folder_info_analysis(masterpath, subfolder, extension, neuronstart, neuronen
     filtered_rates = list()
     for stimulus_index in range(num_stimuli):
         ratemean = np.mean(rates[stimulus_index]) # uses mean of ALL neurons for ONE stimulus
-        ratestd = np.std(rates[stimulus_index])
+        assert(np.isclose((ratemean, 0)))
+        ratestd = np.std(rates[stimulus_index]) # std of all neurons within stimulus
         filtered_rates.append(np.zeros(rates[stimulus_index].shape))
 
         # Use the Standard Dev to assign > or < or = mean
