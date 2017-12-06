@@ -18,6 +18,7 @@ class Synapse_Mask:
         self.post_layers = self.post // self.total_per_layer # for each synapse the layer id of the postsynamptic layer
 
         error =  (self.total_per_layer * self.n_layer) - max(np.max(self.pre), np.max(self.post))-1
+
         if (error < 0):
             raise ValueError("There is a synapse involving a neuron that should not exist.")
         elif (error > 0):
@@ -83,11 +84,11 @@ def multiple_connections_histogram(synapses):
     return count_of_synapses
 
 
-def neuron_stats_to_layer(neuron_info, input_layer_count, input_neurons_per_layer, network_info):
+def neuron_stats_to_layer(neuron_info, input_layer_count, input_neurons_per_layer, network_info, target_column="synapse_count"):
     """
     Split synapse count information of neurons into layers. Pandas dataframe -> numpy array
 
-    :param neuron_info: pandas dataframe with columns "ids", "synapse_count"
+    :param neuron_info: pandas dataframe with columns "ids", target_column
     :param input_layer_count: number of input layers (neurons with negative ids)
     :param input_neurons_per_layer: neurons per input layer
     :param network_info: the usual dict
@@ -97,7 +98,7 @@ def neuron_stats_to_layer(neuron_info, input_layer_count, input_neurons_per_laye
     input_layer = list()
 
     input_neuron_ids = neuron_info[ neuron_info.ids < 0].ids.values - np.min(neuron_info.ids)
-    input_neuron_values = neuron_info[ neuron_info.ids < 0].synapse_count
+    input_neuron_values = neuron_info[ neuron_info.ids < 0][target_column]
 
     input_collector = np.zeros((input_layer_count, input_neurons_per_layer))
 
@@ -121,8 +122,8 @@ def neuron_stats_to_layer(neuron_info, input_layer_count, input_neurons_per_laye
     layerwise = helper.split_into_layers(normal_neuron_info, network_info)
     for l_id, layer in enumerate(layerwise):
         exc, inh = helper.split_exc_inh(layer, network_info)
-        exc_collector[l_id, exc.ids] = exc.synapse_count.values
-        inh_collector[l_id, inh.ids] = inh.synapse_count.values
+        exc_collector[l_id, exc.ids] = exc[target_column].values
+        inh_collector[l_id, inh.ids] = inh[target_column].values
 
     return input_collector, exc_collector, inh_collector
 
@@ -189,6 +190,66 @@ def weighted_presynaptic_actvity(mask, net, weights, firing_rates):
 
     return np.sum(weighted_fr, axis=2)
 
+
+def paths_to_neurons(input_neurons, architecture, coefficient, max_path_length=1, maximum_neuron_id=0):
+    """
+    For each neuron compute a value that reflects how many paths reach this neuron from an active input neuron.
+
+    $$n_i = \sum_{p \in AllPathsFromInputNeuronTo_n_i} c ^{|p|}$$
+
+    :param input_neurons: list of source neuron ids
+    :param architecture: pandas dataframe with columns pre and post
+    :param coefficient: each path is weighted by coefficient^(path_length)
+    :param maximum_neuron_id: highest neuron id (in case there are no synapses to this neuron, for example if it is inhibitory)
+    :return:
+    """
+
+    all_neurons = np.unique(np.concatenate([architecture.pre.values, architecture.post.values]))
+
+    minimum_id = np.min(all_neurons)
+    maximum_id = np.max(all_neurons)
+
+
+    # assert(len(all_neurons) == (maximum_id - minimum_id + 1))
+    maximum_id = max(maximum_id, maximum_neuron_id)
+
+    pre_ids = architecture.pre.values - minimum_id
+    post_ids = architecture.post.values - minimum_id
+    n_neurons = maximum_id - minimum_id + 1
+
+    incoming_value = np.zeros(n_neurons) # pd.DataFrame({"value": np.zeros(n_neurons)}, index=all_neurons)
+    incoming_value[np.array(input_neurons) - minimum_id] = 1
+
+    collector = np.zeros(n_neurons)
+
+
+
+    for l in range(max_path_length+1):
+        # calculate value thats propagated along the synapses
+        outgoing_value = coefficient * incoming_value
+
+        # save the new paths that we just found
+        collector += incoming_value
+        incoming_value[:] = 0
+
+        # propagate path along the synapses value n found at pos i
+        incoming_value = np.bincount(post_ids, outgoing_value[pre_ids], minlength=n_neurons)
+        # for each synapse (which has a post_id and a pre_id: incoming_value[post_id] += outgoing_value[pre_id]
+
+
+    final_actual_ids = np.arange(n_neurons) + minimum_id
+
+    return pd.DataFrame({'ids': final_actual_ids, 'path_values': collector}, index=final_actual_ids)
+
+
+
+
+
+
+
+
+
+    pass
 
 
 
@@ -331,6 +392,7 @@ def incoming_synapses_of_all_types(synapses, network_architekture):
     exc_to_inh = synapse_count_tensor(mask.exc_to_inhibitory())
 
     return dict(exc_FF=exc_FF, exc_FB=exc_FB, exc_L=exc_L, inh_L=inh_L, exc_to_inh=exc_to_inh)
+
 
 
 def outgoing_synapses_of_all_types(synapses, network_architekture):

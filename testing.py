@@ -22,7 +22,7 @@ import spikeAnalysisToolsV2.overviews as overview
 import spikeAnalysisToolsV2.combine_stimuli as combine
 import spikeAnalysisToolsV2.plotting as spikeplot
 import spikeAnalysisToolsV2.information_scores as info
-import spikeAnalysisToolsV2.synapse_analysis as synapses
+import spikeAnalysisToolsV2.synapse_analysis as synapse_analysis
 
 
 
@@ -290,7 +290,20 @@ def test_weighted_presynaptic_firing_rates():
     return weighted_current
 
 
+def test_paths_to_neuron():
+    path = "/Users/clemens/Documents/Code/ModelClemens/output/11_29-01_52_white_circle_l_vs_r_ALS_smallSTDP/initial"
+
+    network_architecture = dict(num_inh_neurons_per_layer=32 * 32, num_exc_neurons_per_layer=64 * 64, num_layers=4)
+    synapses = data.load_network(path, True, True)
+    mask = synapse_analysis.Synapse_Mask(network_architecture, synapses)
+
+    filter_path = "/Users/clemens/Documents/Code/ModelClemens/Data/MatlabGaborFilter/centered_inputs/Filtered"
+    all_filter = data.load_filter_all_obj(filter_path)
+    bla = synapse_analysis.paths_to_neurons([-3485], synapses, 0.9, max_path_length=3)
+    return bla
 
 
-wc = test_weighted_presynaptic_firing_rates()
+
+
+wc = test_paths_to_neuron()
 # net, w = test_network_loading()

@@ -216,7 +216,7 @@ def id_to_position_input(id, n_layer, side_length):
     """
     assert(id < 0)
 
-    id *= -1
+    id = (-1 * id) - 1
 
     n_per_layer = side_length ** 2
 

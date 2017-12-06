@@ -43,8 +43,8 @@ def instant_FR_for_all_layers(spikes, network_architecture, time_step):
         all_inh_collector.append(inh_InstantFR)
         all_exc_collector.append(exc_InstantFR)
 
-    excitatory_timecourse = np.stack(all_exc_collector, axis=0)
-    inhibitory_timecourse = np.stack(all_inh_collector, axis=0)
+    excitatory_timecourse = np.stack(all_exc_collector, axis=1)
+    inhibitory_timecourse = np.stack(all_inh_collector, axis=1)
 
     return time_exc, excitatory_timecourse, inhibitory_timecourse,
 

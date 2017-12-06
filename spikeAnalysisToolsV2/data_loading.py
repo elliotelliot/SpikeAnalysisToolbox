@@ -4,6 +4,7 @@ import csv
 from multiprocessing import Pool
 from functools import partial
 import os
+from . import helper
 
 
 
@@ -133,7 +134,7 @@ Returns:
     init_weights: list of synaptic weights (before training) only if initial_weights=True
     weights: list of synaptic weights after training
 """
-def load_network(pathtofolder, binaryfile, initial_weights):
+def load_network(pathtofolder, binaryfile=True, initial_weights=False):
     if pathtofolder[-1] != "/":
         pathtofolder += "/"
 
@@ -301,3 +302,162 @@ def load_testing_stimuli_info(experiment_folder):
 
     proper_objects = [obj for obj in objects if obj['count'] != 0]
     return proper_objects
+
+def load_testing_stimuli_names(experiment_folder):
+    cur_obj = 0
+    collector = list()
+    with open(experiment_folder + "/testing_list.txt", "r") as file:
+        for line in file:
+            raw_text = line.strip()
+            if raw_text != "*":
+                collector.append("obj{}:{}".format(cur_obj, raw_text))
+            else:
+                cur_obj += 1
+    return collector
+
+class FilterValues:
+    """class to save filter values"""
+    def __init__(self, scale, orientation, phase, values, obj_name=None):
+        """
+        :param scale: int with scale of this filter
+        :param orientation: orientation of this object in degree
+        :param phase: phase of this filter
+        :param values: numpy array with filter values as read out from folder
+        """
+        self.scale = int(scale)
+        self.orientation = int(orientation)
+        self.phase = int(phase)
+        self.values = self.weird_filter_reading_workaround(values)
+        self.obj_name = obj_name
+
+    def __repr__(self):
+        return "<Filter: {obj_name}.{scale}.{orientation}.{phase}>".format(**self.__dict__)
+
+    @staticmethod
+    def load_from_file(filepath):
+        filename = filepath.split("/")[-1]
+        filter_parameters = filename.split(".")
+        # theses have positions [name.scale.orientation.phase.gbo]
+        #                         0     1       2          3   4
+        assert(filter_parameters[4] == "gbo")
+        values = np.fromfile(filepath, dtype=np.float32)
+
+        return FilterValues(scale=filter_parameters[1], orientation=filter_parameters[2], phase=filter_parameters[3], values=values, obj_name=filter_parameters[0])
+
+    @staticmethod
+    def weird_filter_reading_workaround(values):
+        """
+        Because the filter values are not read consecutively in Spike::Neurons::ImagePoissonInputSpikingNeurons
+         we have to use this workaround to end up with an array that resembles the one spike gets after reading
+
+         Basically we are transposing
+        """
+        n_values = len(values)
+        side_length = helper.get_side_length(n_values)
+
+        # Spike reads the values as if they were written in F order
+        in2d = np.reshape(values, (side_length, side_length), order='F')
+
+        # it then saves them into 'C' order
+        return in2d.flatten(order='C')
+
+
+    def get_garbor_index(self, *args, **kwargs):
+        """
+        returns the index of this filter
+        :param scales, orientations, phases, any of these can be given as a key word argument as a list, for not given ones defaults will be used.
+        :return: index of filter
+        """
+        assert(len(args)==0)
+        all_filter_options = dict(scales = [2], orientations = [0, 45, 90, 135], phases = [0, 180])
+        all_filter_options.update(kwargs)
+
+        scale_id = all_filter_options['scales'].index(self.scale)
+        orientation_id = all_filter_options['orientations'].index(self.orientation)
+        phase_id = all_filter_options['phases'].index(self.phase)
+
+        total_number_of_wavelengths = len(all_filter_options['scales'])
+        total_number_of_phases = len(all_filter_options['phases'])
+
+        garbor_id = orientation_id * (total_number_of_wavelengths * total_number_of_phases) + scale_id * total_number_of_phases + phase_id
+        return garbor_id
+
+    def get_global_id_values(self, *args, **kwargs):
+        """
+        returns a pandas dataframe with columns 'ids' (i.e. global id values) and 'filter_values'
+
+        :param scales, orientations, phases, any of these can be given as a key word argument as a list, for not given ones defaults will be used.
+        :return: pandas dataframe with 'ids' and 'filter_values'
+        """
+
+        gabor_id = self.get_garbor_index(*args, **kwargs)
+
+        neurons_per_filter = self.values.shape[0]
+
+        start_index_for_current_gabor_image = gabor_id * neurons_per_filter
+
+        indices = self.corrected_id(np.arange(neurons_per_filter) + start_index_for_current_gabor_image)
+
+        return pd.DataFrame({'ids': indices, 'filter_values': self.values}, index=indices)
+
+
+
+
+    @staticmethod
+    def corrected_id(id):
+        return (-1 * (id)) - 1
+
+
+
+
+def load_filter_values_list(path_to_filter):
+    """
+    return list of FilterValues objects for the given stimulus
+    :param path_to_filter: string path to the '.flt' directory
+    :return:
+    """
+    assert(path_to_filter[-4:] == '.flt')
+    subfolders = os.listdir(path_to_filter)
+    collector = list()
+
+    for garbor_filter in subfolders:
+        if garbor_filter[-4:] == '.gbo':
+            #it is a filter
+            new_filter = FilterValues.load_from_file(path_to_filter+"/"+garbor_filter)
+            collector.append(new_filter)
+
+    return collector
+
+def load_filter_values_global_data_frame(path_to_filter):
+    """
+    load all filter values into one big pandas dataframe with columns "ids" and "filter_values"
+    it will have ids corresponding to the ones in the network architecture files
+
+    :param path_to_filter: path to '.flt' directory
+    :return: pandas dataframe with columns "ids", "filter_values"
+    """
+
+    filter_list = load_filter_values_list(path_to_filter)
+
+    pd_frames = [fil.get_global_id_values() for fil in filter_list]
+
+    big_df = pd.concat(pd_frames)
+
+    sorted = big_df.sort_index(ascending=False)
+
+    assert(np.all(sorted.index == FilterValues.corrected_id(np.arange(128*128*8))))
+
+    return sorted
+
+
+def load_filter_all_obj(path_to_filter_dir):
+    """
+    load all filtered values for all objects into a dictonary
+    :param path_to_filter_dir: path to folder containing all '.flt' dirs
+    :return: dictory with 'object_name': pandas_dataframe with 'ids' and 'filter_values'
+    """
+    collector = dict()
+    for filter in os.listdir(path_to_filter_dir):
+        if filter[-4:] == ".flt":
+            collector[filter[:-4]] = load_filter_values_global_data_frame(path_to_filter_dir + "/" + filter)
+    return collector

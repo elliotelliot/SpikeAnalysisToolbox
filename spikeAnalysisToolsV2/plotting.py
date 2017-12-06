@@ -287,6 +287,88 @@ def plot_ranked_neurons(list_of_things, title, n_to_plot=100, item_label=None, v
 
         layerAX.legend()
 
+def plot_fr_histogram(nested_firing_rates, stimulus_names = None, n_bins=100):
+    """
+
+    :param nested_firing_rates: firing rates for one epoch (multiple stimuli though)
+    :return:
+    """
+    excitatory_rates, inhibitory_rates = helper.nested_list_of_stimuli_2_np(nested_firing_rates)
+
+    num_stimuli, num_layers, num_neurons = excitatory_rates.shape
+
+    if stimulus_names is None:
+        stimulus_names = range(num_stimuli)
+    else:
+        assert(num_stimuli == len(stimulus_names))
+
+    bins = np.linspace(0, 150, n_bins)
+
+    for stimulus in range(num_stimuli):
+        fig = plt.figure(figsize=(15, 28))
+        fig.suptitle("Stimulus: {}".format(stimulus_names[stimulus]), fontsize=16)
+
+        subpltEX = fig.add_subplot(1, 2,  1)
+        subpltEX.set_title("Excitatory", fontsize=14, fontweight="bold")
+        subpltEX.set_xlabel("Frequency [Hz]")
+
+        subpltIN = fig.add_subplot(1, 2,  2)
+        subpltIN.set_title("Inhibitory", fontsize=14, fontweight="bold")
+        subpltIN.set_xlabel("Frequency [Hz]")
+
+        for layer in range(num_layers):
+            subpltEX.hist(excitatory_rates[stimulus, layer], label="Layer: {}".format(layer), bins = bins, histtype='step')
+            subpltIN.hist(inhibitory_rates[stimulus, layer], label="Layer: {}".format(layer), bins = bins, histtype='step')
+
+
+def plot_fr_ranked(nested_firing_rates, stimulus_names = None, ylim=150, percentage_to_plot=0.5):
+    """
+
+    :param nested_firing_rates: firing rates for one epoch (multiple stimuli though)
+    :return:
+    """
+
+    excitatory_rates, inhibitory_rates = helper.nested_list_of_stimuli_2_np(nested_firing_rates)
+
+    num_stimuli, num_layers, num_neurons = excitatory_rates.shape
+
+    plot_n_exc = int(excitatory_rates.shape[-1]*percentage_to_plot)
+    plot_n_inh = int(inhibitory_rates.shape[-1]*percentage_to_plot)
+
+    if stimulus_names is None:
+        stimulus_names = range(num_stimuli)
+    else:
+        assert(num_stimuli == len(stimulus_names))
+
+    # dimensions: [stimulus, layer, neuron_id]
+    exc_rates_sorted = np.sort(excitatory_rates,
+                               axis=2)[:, :, :-plot_n_exc:-1]  # sort so that the firing rates in each stimulus and layer are sorted
+    # dimensions: [stimulus, layer, neuron_activity_rank]
+    inh_rates_sorted = np.sort(inhibitory_rates, axis=2)[:,:, :-plot_n_inh:-1]
+
+    for stimulus in range(num_stimuli):
+        fig = plt.figure(figsize=(15, 7))
+        fig.suptitle("Stimulus: {}".format(stimulus_names[stimulus]), fontsize=16)
+
+        subpltEX = fig.add_subplot(1, 2, 1)
+        plt.tight_layout(pad=8.0)
+        subpltEX.set_title("Excitatory: max: {}".format(exc_rates_sorted[stimulus, :, 0]), fontsize=14, fontweight="bold")
+        subpltEX.set_ylabel("Frequency [Hz]")
+        subpltEX.set_xlabel("Neuron rank")
+        subpltEX.set_ylim(0, ylim)
+
+        subpltIN = fig.add_subplot(1, 2, 2)
+        plt.tight_layout(pad=8.0)
+        subpltIN.set_title("Inhibitory: max: {}".format(inh_rates_sorted[stimulus, :, 0]), fontsize=14, fontweight="bold")
+        subpltIN.set_ylabel("Frequency [Hz]")
+        subpltIN.set_xlabel("Neuron rank")
+        subpltIN.set_ylim(0, ylim)
+
+        for layer in range(num_layers):
+            subpltEX.plot(exc_rates_sorted[stimulus, layer], label="Layer {}".format(layer))
+            subpltIN.plot(inh_rates_sorted[stimulus, layer], label="Layer {}".format(layer))
+
+        subpltEX.legend()
 
 
 
