@@ -183,19 +183,28 @@ def animate_neuron_value_development(exc, inh):
     ani = animation.ArtistAnimation(fig, ims, interval=200, blit=True, repeat_delay=22000)
     return ani
 
-def show_values_all_layer(values, figure_title, cmap='plasma'):
+def show_values_all_things(values, figure_title, thing_label = None, cmap='plasma'):
     """
-    Plot the values for all layers collor coded
-    :param values: np array of shape [layer, neuron_id] or [layer, lines, columns]
+    show values for all thingks
+
+    :param values: np array of shape [thing, neuron_id] or [thing, rows, columns]
     :param figure_title: title of the figure
     :param cmap: colormap to be used
     :return:
     """
+    if len(values.shape)==1:
+        values = np.expand_dims(values, 0)
     num_layers = values.shape[0]
+
+    if thing_label == None:
+        thing_label = ["values for Layer {}".format(l) for l in range(num_layers)]
+    else:
+        assert(num_layers == len(thing_label))
+
     vmin =values.min()
     vmax =values.max()
 
-    fig = plt.figure(figsize=(19, 8),)
+    fig = plt.figure(figsize=(12, 5*np.ceil(num_layers/2)),)
     fig.suptitle(figure_title, fontsize=16)
 
     if(len(values.shape) > 1 and values.shape[-2] != values.shape[-1]):
@@ -204,13 +213,13 @@ def show_values_all_layer(values, figure_title, cmap='plasma'):
         reshaped = values
 
     for layer in range(num_layers):
-        subPlotAX = fig.add_subplot(2, np.ceil(num_layers/2), layer + 1)
+        subPlotAX = fig.add_subplot(np.ceil(num_layers/2), 2, layer + 1)
 
-        subPlotAX.set_title("Values for Layer {}".format(layer))
+        subPlotAX.set_title(thing_label[layer])
         im = subPlotAX.imshow(reshaped[layer, :, :], vmin=vmin, vmax=vmax, cmap=cmap)
 
-    cax = fig.add_axes([0.95, 0.2, 0.03, 0.6])
-    fig.colorbar(im, cax=cax)
+    #cax = fig.add_axes([0.95, 0.2, 0.03, 0.6])
+    #fig.colorbar(im, cax=cax)
 
 
 
@@ -249,7 +258,7 @@ def plot_information_measure_advancement(before, after, n_to_plot = 1000, item_l
             layerAX.legend()
 
 
-def plot_ranked_neurons(list_of_things, title, n_to_plot=100, item_label=None, vmin=0.0):
+def plot_ranked_neurons(list_of_things, title, n_to_plot=100, item_label=None, vmin=0.0, vmax=None):
     """
     Plot ranked neuron value. there will be as many subplots as layer. each contains as many lines as there are things
     value of first line at x=5 is the value of the 5th best neuron (with respect to the first thing)
@@ -270,7 +279,8 @@ def plot_ranked_neurons(list_of_things, title, n_to_plot=100, item_label=None, v
 
     sorted_stuff = np.sort(list_of_things, axis=2)
 
-    vmax = np.max(sorted_stuff)
+    if vmax is None:
+        vmax = np.max(sorted_stuff)
 
 
     fig = plt.figure(figsize=(15, 8))
@@ -346,6 +356,7 @@ def plot_fr_ranked(nested_firing_rates, stimulus_names = None, ylim=150, percent
     # dimensions: [stimulus, layer, neuron_activity_rank]
     inh_rates_sorted = np.sort(inhibitory_rates, axis=2)[:,:, :-plot_n_inh:-1]
 
+    fig_collector = list()
     for stimulus in range(num_stimuli):
         fig = plt.figure(figsize=(15, 7))
         fig.suptitle("Stimulus: {}".format(stimulus_names[stimulus]), fontsize=16)
@@ -369,6 +380,8 @@ def plot_fr_ranked(nested_firing_rates, stimulus_names = None, ylim=150, percent
             subpltIN.plot(inh_rates_sorted[stimulus, layer], label="Layer {}".format(layer))
 
         subpltEX.legend()
+        fig_collector.append(fig)
+    return fig_collector
 
 
 
@@ -435,7 +448,7 @@ def plot_information_development(info, epochs=None, mean_of_top_n = 'all', thres
         epochs = list(epochs)
 
     if not item_label:
-        item_label = list(range(n_objects))
+        item_label = list(["Item {}".format(i) for i in range(n_objects)])
     else:
         assert(len(item_label) == n_objects)
 
@@ -457,7 +470,7 @@ def plot_information_development(info, epochs=None, mean_of_top_n = 'all', thres
 
         axAvg  = fig.add_subplot(2, n_objects, i + 1)
         axAvg.set_ylim(lower_y_lim, 1.1 * avg_max)
-        axAvg.set_title("Average info of top {} neurons for Item {}".format(mean_of_top_n, item))
+        axAvg.set_title("Average info of top {} neurons for {}".format(mean_of_top_n, item))
 
 
         axN_neurons = fig.add_subplot(2, n_objects, n_objects + i + 1)
@@ -471,6 +484,8 @@ def plot_information_development(info, epochs=None, mean_of_top_n = 'all', thres
 
         axAvg.legend()
         axN_neurons.legend()
+
+    return fig
 
 
 def plot_firing_rates_colored_by_object(firing_rates, object_list, title_string):
@@ -572,6 +587,9 @@ def plot_development_for_object(values, title, object_labels=None):
     """
     n_epochs, n_objects, n_layer = values.shape
 
+    minval = np.min(values)
+    maxval = np.max(values)
+
     if object_labels is None:
         object_labels = ['Obj {}'.format(o) for o in range(n_objects)]
     else:
@@ -584,6 +602,7 @@ def plot_development_for_object(values, title, object_labels=None):
     for obj_id, obj_name in enumerate(object_labels):
         ax = fig.add_subplot(1, n_objects, obj_id+1)
         ax.set_title(obj_name)
+        ax.set_ylim(minval, maxval)
         for l in range(n_layer):
             ax.plot(values[:, obj_id, l], label="Layer {}".format(l))
 

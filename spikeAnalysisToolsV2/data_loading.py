@@ -219,7 +219,7 @@ def load_weights_all_epochs(basic_path, epoch_indices, epoch_folder="testing", i
     """
     Load weights for all epochs
     :param basic_path: the top level folder containing the experiments result
-    :param epoch_indices: indices of the epochs to load. (Will look for folders ["epoch_folder/epoch{}".format(e) for e in epoch_indices]
+    :param epoch_indices: indices of the epochs to load. (Will look for folders ["epoch_folder/epoch{}".format(e) for e in epoch_indices], alternativly it can be the string names of the subfolders directly
     :param epoch_folder: the name of the folder containing the folders "epochX". Whith each epoch folder containing a weights file.
     :param initial_folder_name: name for the initial run (before training). The Network architecture will be loaded from here
     :param binary: is it a binary file
@@ -231,7 +231,15 @@ def load_weights_all_epochs(basic_path, epoch_indices, epoch_folder="testing", i
     if basic_path[-1] != "/":
         basic_path += "/"
 
-    all_epoch_paths = [basic_path + epoch_folder + "/epoch{}".format(e) for e in epoch_indices]
+    if type(epoch_indices[0]) == int:
+        print("Epochs given as indices")
+        all_epoch_paths = [basic_path + epoch_folder + "/epoch{}".format(e) for e in epoch_indices]
+    if type(epoch_indices[0]) == str:
+        print("Epochs given by subfodler names")
+        all_epoch_paths = [basic_path + "/" + epoch_name for epoch_name in epoch_indices]
+    else:
+        raise ValueError("epoch_indices has to be a list of either strings or ints")
+
 
     full_network_initial = load_network(basic_path + initial_folder_name, binaryfile=binary, initial_weights=initial_weights)
 
@@ -314,6 +322,64 @@ def load_testing_stimuli_names(experiment_folder):
             else:
                 cur_obj += 1
     return collector
+
+
+def load_testing_stimuli_indices_from_wildcarts(experiment_folder, objects):
+    """
+    Load indices of objects, objects are specified with wildcarts. e.g. 1*cl is the object containing all stimuli
+    with loc=1, type=circle, position=l but arbitrary color.
+
+    e.g. 1**l would be a right border at location one neuron
+
+    :param experiment_folder: path to the folder containting testing_list.txt
+    :param objects: list of strings of type 1wcl (loc, color, type, pos)
+    :return: list of dictionaries, first item is the dictionary containing in it's filed 'elements' indices of all stimuli that fullfill the specifications of the first string in objects
+    """
+    result = [dict(filter=filter_string, elements=set(), indices=list(), count=0) for filter_string in objects]
+
+    #### HELPER CLASS
+    class Object_Filter:
+        def __init__(self, filter_string):
+            """filter_string for example 1*wcl"""
+            self.constraints = [(i, value) for i, value in enumerate(filter_string) if value != "*"]
+
+        def __call__(self, stimulus_name):
+            """check if the stimulus fullfills the requirements"""
+            for ind, val in self.constraints:
+                if stimulus_name[ind] != val:
+                    return False # one constraint was violated
+            return True # went through all the constraints without a problem.
+    ### END HELPER CLASS
+
+    filter = [Object_Filter(filter_string) for filter_string in objects]
+    cur_stim_id = 0
+
+    with open(experiment_folder + "/testing_list.txt", "r") as file:
+        for line in file:
+            raw_text = line.strip()
+            n_obj_this_stimulus_is_part_of = 0
+
+            if raw_text != "*":
+                for fil_id, fil in enumerate(filter):
+                    if fil(raw_text): #stimulus part of object fil_id
+                        result[fil_id]['indices'].append(cur_stim_id)
+                        result[fil_id]['count'] += 1
+                        result[fil_id]['elements'].add(raw_text)
+                        n_obj_this_stimulus_is_part_of += 1
+
+                # check if the stimulus had exactly one home
+                if n_obj_this_stimulus_is_part_of != 1:
+                    raise ValueError("The stimulus {} was part of {} objects".format(raw_text,n_obj_this_stimulus_is_part_of))
+
+                cur_stim_id += 1
+
+
+    return result
+
+
+
+
+
 
 class FilterValues:
     """class to save filter values"""
@@ -400,9 +466,6 @@ class FilterValues:
 
         return pd.DataFrame({'ids': indices, 'filter_values': self.values}, index=indices)
 
-
-
-
     @staticmethod
     def corrected_id(id):
         return (-1 * (id)) - 1
@@ -428,6 +491,26 @@ def load_filter_values_list(path_to_filter):
 
     return collector
 
+def get_epochs(experiment_folder, subfolder="testing"):
+    """
+    Load list of all epoch folders for an experiment
+    :param experiment_folder: path to the folder containing the experiment
+    :param subfolder: in which to look for the epochs
+    :return: list of strings that give path name like experiment_folder + "/" subfolder
+    """
+    if type(experiment_folder) == list:
+        experiment_folder =  experiment_folder[0]
+
+    import os
+    collector = list()
+    for potential_exp in os.listdir(experiment_folder+"/"+subfolder):
+        if potential_exp[:5] == "epoch":
+            collector.append(int(potential_exp[5:]))
+
+    collector.sort()
+    return ["{}/epoch{}".format(subfolder, e) for e in collector]
+
+
 def load_filter_values_global_data_frame(path_to_filter):
     """
     load all filter values into one big pandas dataframe with columns "ids" and "filter_values"
@@ -450,14 +533,21 @@ def load_filter_values_global_data_frame(path_to_filter):
     return sorted
 
 
-def load_filter_all_obj(path_to_filter_dir):
+def load_filter_all_obj(path_to_filter_dir, output="pandas"):
     """
     load all filtered values for all objects into a dictonary
     :param path_to_filter_dir: path to folder containing all '.flt' dirs
     :return: dictory with 'object_name': pandas_dataframe with 'ids' and 'filter_values'
     """
+    load_filter_func = None
+    if output == "pandas":
+        load_filter_func = load_filter_values_global_data_frame
+    elif output == "list":
+        load_filter_func = load_filter_values_list
+
+
     collector = dict()
     for filter in os.listdir(path_to_filter_dir):
         if filter[-4:] == ".flt":
-            collector[filter[:-4]] = load_filter_values_global_data_frame(path_to_filter_dir + "/" + filter)
+            collector[filter[:-4]] = load_filter_func(path_to_filter_dir + "/" + filter)
     return collector

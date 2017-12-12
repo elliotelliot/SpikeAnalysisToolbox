@@ -82,3 +82,4 @@ def print_firing_rates_tables(subfolder_firing_rates, info_times, subfolders, ex
             df2 = pd.DataFrame(data=means_overview, columns=columns2, index=index2)
             print("***Overview***\n")
             print(df2, '\n')
+
