@@ -289,7 +289,7 @@ def load_testing_stimuli_info(experiment_folder):
     """
     load the information about the stimuli presented during testing. There is assumed to be a file "testing_list.txt" with the information in the experiment_folder
     :param experiment_folder: top level folder of the experiment
-    :return:
+    :return: dictionary with fields 'elements', 'count', 'indices'
     """
     objects = []
     current_object = {'count': 0, 'elements': set(), 'indices': list()}
@@ -310,6 +310,36 @@ def load_testing_stimuli_info(experiment_folder):
 
     proper_objects = [obj for obj in objects if obj['count'] != 0]
     return proper_objects
+
+def random_label_from_testing_list(experiment_folder, n_objects):
+    """
+    Assumes that in the experiment folder there is a file called testing_list.txt. In this one the stimuli are presented in order multiple times
+    i.e. all stimuli in fixed order, line with star, again all stimuli in the same order, line with star, etc.
+    These stimuli will then be assigned random objects. (n_objects many of them)
+,
+    :param n_objects: how many objects we want
+    :param experiment_folder: folder with the file testing_list.txt
+    :return: list of lists, [object][stimulus] -> index of the stimulus for the object
+    """
+    repeats = load_testing_stimuli_info(experiment_folder)
+    # in the original folder there is a star after each presentation of all objects. each entry in this list is a 'virtual'
+    # object containing all stimuli
+
+    n_repeats = len(repeats)
+    n_stimuli = repeats[0]['count']
+    stimuli = repeats[0]['elements']
+    stimulus_indices = np.array(repeats[0]['indices'])
+
+    for i, repeat in enumerate(repeats):
+        assert(stimuli == repeat['elements'])
+        assert(np.all(stimulus_indices + (i * n_stimuli) == np.array(repeat['indices'])))# this is pretty useless
+
+    assert((n_stimuli % n_objects) == 0)
+
+    n_transforms = n_stimuli // n_objects
+
+    return helper.random_label(n_objects=n_objects, n_transforms=n_transforms, n_repeats=n_repeats)
+
 
 def load_testing_stimuli_names(experiment_folder):
     cur_obj = 0
@@ -401,6 +431,7 @@ class FilterValues:
 
     @staticmethod
     def load_from_file(filepath):
+        print("loading from {}".format(filepath))
         filename = filepath.split("/")[-1]
         filter_parameters = filename.split(".")
         # theses have positions [name.scale.orientation.phase.gbo]
@@ -551,3 +582,5 @@ def load_filter_all_obj(path_to_filter_dir, output="pandas"):
         if filter[-4:] == ".flt":
             collector[filter[:-4]] = load_filter_func(path_to_filter_dir + "/" + filter)
     return collector
+
+

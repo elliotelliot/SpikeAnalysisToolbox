@@ -340,3 +340,27 @@ def epoch_subfolders_to_tensor(all_epochs):
     :return: exc_rates,
     """
     raise NotImplementedError("don't know what happend here")
+
+
+def random_label(n_objects, n_transforms, n_repeats):
+    """
+    Create random label where each stimuli always is part of the same object througout multiple repeats
+    :param n_objects: number of objects
+    :param n_transforms: number of transforms per object
+    :param n_repeats: how often is each stimulus presented. (assumed that all stimulus are presented before one is presented again)
+    :return: array of indices belonging to an object
+    """
+
+    n_stimuli = n_objects * n_transforms
+
+    one_presentation_of_all = np.random.choice(n_stimuli, size=(n_objects, n_transforms), replace=False)
+
+    # repeat for multiple presentations
+    all_presentations = [one_presentation_of_all + (r * n_stimuli) for r in range(n_repeats)]
+
+    all_presentations_np = np.concatenate(all_presentations, axis=1)
+
+    return [list(l) for l in all_presentations_np] # unpack the numpy into a list of lists
+
+
+
