@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from . import helper
+from numba import jit
 
 class Synapse_Mask:
     """
@@ -59,6 +60,9 @@ class Synapse_Mask:
 
     def post_in_layer(self, l):
         return self.post_layers == l
+
+    def from_input(self):
+        return self.pre < 0
 
 
 
@@ -246,10 +250,68 @@ def paths_to_neurons(input_neurons, architecture, coefficient, max_path_length=1
 
 
 
+def shuffle_weights_within_layer(synapses, network_architecture, n_neurons_per_input_layer):
+    """
+    Shuffle weighs within each category of neurons within each layer
+    :param synapses: pandas dataframe with 'pre', 'post', 'weights'
+    :param network_architecture: usual dict
+    :param n_neurons_per_input_layer: how many input neurons are in each input layer
+    :return: pandas dataframe of with same columns as the original one, but weights are no shuffled
+    """
+
+    #check that n_neurons_per_input_layer is reasonable
+    first_input_neuron = np.min(synapses.pre)
+    assert(first_input_neuron % n_neurons_per_input_layer == 0)
+    #checks wether the last input neuron is the last neuron of a layer with n_neurons_per_input_layer many neurons
+
+
+    mask = Synapse_Mask(network_architecture, synapses)
+
+    old_weights = synapses.weights.values
+    new_weights = np.copy(old_weights)
+
+    #first go through all inner synapses (not comming from input)
+    synapse_types = [mask.exc_feed_forward(), mask.exc_feed_back()]
+
+    not_input = np.invert(mask.from_input())
+
+    for post_layer in range(network_architecture["num_layers"]):
+        layer_selector = mask.post_in_layer(post_layer)
+        for type in synapse_types:
+            this_population_mask = not_input & layer_selector & type
+            assert(this_population_mask.shape == not_input.shape)
+
+            weights_this_population = old_weights[this_population_mask]
+
+            new_weights[this_population_mask] = np.random.permutation(weights_this_population)
+
+
+    # now for the input layers
+    n_input_layers = -1 * (first_input_neuron // n_neurons_per_input_layer)
+    print("{} many input layers".format(n_input_layers))
+
+    input_layer_nr = (-1 * (synapses.pre.values + 1)) // n_neurons_per_input_layer # this will only give reasonable values for neurons that are actually in the input layer
+
+    for inp_l in range(n_input_layers):
+        is_in_that_layer = (input_layer_nr == inp_l)
+        this_population_mask = is_in_that_layer & mask.from_input()
+
+        assert (this_population_mask.shape == not_input.shape)
+
+        weights_this_population = old_weights[this_population_mask]
+
+        new_weights[this_population_mask] = np.random.permutation(weights_this_population)
+
+
+    # check if the new weights are reasonable
+    # assert(not np.any(np.isnan(new_weights))) # each
+    assert(np.any(old_weights != new_weights)) #some changed
+
+    synapses.weights = new_weights
+    return synapses
 
 
 
-    pass
 
 
 
@@ -412,3 +474,115 @@ def outgoing_synapses_of_all_types(synapses, network_architekture):
 
 
 
+class BackTracer:
+    """Class to trace back synapses to V1"""
+
+    def __init__(self, synapses, network_info, input_dim=128, n_input_layer=8, weights=None, percentage_thresholds=None, mask=None):
+        """
+        :param synapses: pandas data frame with at least pre and post ids
+        :param weights: same shape as network. It will take the synapses with the strongest value her
+        :param percentage_thresholds: top n% synapses are traced
+        :param network_info:  dict(num_inh_neurons_per_layer=32 * 32, num_exc_neurons_per_layer=64 * 64, num_layers=4)
+
+        """
+        if weights is None:
+            weights = synapses.weights.values
+
+        if mask is not None:
+            synapses = synapses[mask]
+            weights = weights[mask]
+
+        assert(len(synapses) == len(weights))
+        self.pre = synapses.pre.values
+        self.post = synapses.post.values
+        self.weights = weights
+        self.network_info = network_info
+        self.percentage_thresholds_default = percentage_thresholds
+        self.input_dim = input_dim
+        self.n_input_layer = n_input_layer
+
+    @jit
+    def trace_back(self, layer, row, column, scaled_input=False, percentage_thresholds=None):
+        """
+        Trace back a neuron indexed by layer, row, column
+        :param layer:
+        :param row:
+        :param column:
+        :param scaled_input: False: returned matrix will be binary 1 if input neuron is connected to target 0 otherwise
+        True: returned matrix is scalar. product of synapse weights on the path that connects this neuron to the target neuron
+        :param percentage_thresholds: Optional if specified in the initializer
+        :return: input_layer, numpy matrix of shape [input_layer, input_dim, input_dim]
+        """
+
+        if percentage_thresholds:
+            self._percentage_thresholds = percentage_thresholds
+        elif self.percentage_thresholds_default:
+            self._percentage_thresholds = self.percentage_thresholds_default
+        else:
+            raise ValueError("A Percentage threshold has to be given either in the constructor or when calling this function")
+
+        self._input_space = np.zeros((self.n_input_layer, self.input_dim, self.input_dim))
+
+        target_neuron_id = helper.position_to_id((layer, row, column), True, self.network_info)
+
+        if scaled_input:
+            self._recursive_trace(target_neuron_id, 1)
+        else:
+            self._recursive_trace(target_neuron_id)
+
+        result = self._input_space
+
+        # tidy up temporary global variables
+        self._input_space = None
+        self._percentage_thresholds = None
+        return result
+
+    @jit
+    def _recursive_trace(self, current_id, weight_product=None):
+        """weight_product if it is None the result in self._input_space is just binary, i.e. this input neuron was connected to the target or not
+        otherwise weight_product=1 it will be the product of all the synaptic weights on the path from the input neuron to the target.
+        """
+        # recursion anchor
+        if current_id<0:
+            # we reached an input neuron
+            layer, row, column = helper.id_to_position_input(current_id, self.n_input_layer, self.input_dim)
+            if weight_product is None:
+                weight_product = 1
+
+            self._input_space[layer, row, column] += weight_product
+
+            return
+        elif weight_product is not None and np.isclose(weight_product, 0):
+            return
+        else:
+
+            # proceed backwards
+
+
+            affereten_synapses_mask = self.post == current_id
+
+            assert(np.any(affereten_synapses_mask))
+
+
+            weights_afferent_synapses = self.weights[affereten_synapses_mask]
+            pre_ids_afferent_synapses = self.pre[affereten_synapses_mask]
+
+            _is_excitatory, (layer,_id_in_layer) = helper.id_to_position(current_id, self.network_info, pos_as_2d=False)
+            assert(_is_excitatory)
+
+            n_syn_to_trace = int(len(weights_afferent_synapses) * self._percentage_thresholds[layer])
+
+            unique_values, count = np.unique(weights_afferent_synapses, return_counts=True)
+            # if np.max(count) > n_syn_to_trace:
+            #     raise RuntimeError("There are {} synapses with exactly the weight {} ".format(np.max(count), unique_values[np.argmax(count)]))
+
+            sorted_indices = np.argsort(weights_afferent_synapses)[::-1]
+
+            for i in sorted_indices[:n_syn_to_trace]:
+                weight_this_synapse = weights_afferent_synapses[i]
+                current_pre_neuron = pre_ids_afferent_synapses[i]
+
+                if weight_product is not None:
+                    weight_product = weight_product * weight_this_synapse
+
+                self._recursive_trace(current_pre_neuron, weight_product)

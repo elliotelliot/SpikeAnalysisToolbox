@@ -200,17 +200,28 @@ def firing_rates_to_single_cell_information(firing_rates, objects, n_bins, calc_
    :return:
    """
    exc_rates, inh_rates = helper.nested_list_of_stimuli_2_np(firing_rates)
-   exc_table = combine.response_freq_table(exc_rates, objects, n_bins=n_bins)
-
-   exc_info = single_cell_information(exc_table)
+   exc_info = firing_rates_numpy_to_single_cell_info(exc_rates, objects, n_bins)
 
    if calc_inhibitory:
-       inh_table = combine.response_freq_table(inh_rates, objects, n_bins=n_bins)
-       inh_info = single_cell_information(inh_table)
+       # inh_table = combine.response_freq_table(inh_rates, objects, n_bins=n_bins)
+       # inh_info = single_cell_information(inh_table)
+        inh_info = firing_rates_numpy_to_single_cell_info(inh_rates, objects, n_bins)
    else:
        inh_info = None
 
    return exc_info, inh_info
+
+def firing_rates_numpy_to_single_cell_info(firing_rates, objects, n_bins=3):
+    """
+    Calculate single cell info for the given firing rates
+    :param firing_rates: numpy array of shape [stimuli, layer, neuron]
+    :param objects: list of list with stimulus ids for that object
+    :param n_bins:
+    :return:
+    """
+    table = combine.response_freq_table(firing_rates, objects, n_bins=n_bins)
+    info = single_cell_information(table)
+    return info
 
 def information_all_epochs(firing_rates_all_epochs, strategy, *args, **kwargs):
     """
@@ -331,3 +342,171 @@ class Caller(object):
         self.kwargs = copy.deepcopy(kwargs)
     def __call__(self, input):
         return self.function(input, **self.kwargs)
+
+
+
+
+class SingleCellDecoder(object):
+    """
+    Class that fits a threshold value for each neuron for each object. Bellow or above that object is present
+    """
+
+    label_bigger_dict = {0: False, 1: True}
+
+    def __init__(self, allow_selectivity_by_being_off=False):
+        """
+
+        :param allow_selectivity_by_being_off: if this is True. A neuron that is consistently below the threshold for object A will cary information for ojbect A. Otherwise neurons are only thought to be selective to object A if they have higher response for it.
+        True: label for higher firing rates might be true or false, False: label for higher firing rate is always true
+        """
+        self.thresholds = None # numpy array of shape [n_objects, n_layers, n_neurons] -> decission threshold
+        self.label_bigger = None # shape [n_objects, n_layers, n_neurons] -> if true, all stimuli that have a higher FR in this neuron will get the label TRUE for that object, else FALSE
+
+        self.false_positive_count = None # shape [n_thresholds, (label_bigger: false/true), n_objects, n_layers, n_neurons] -> for each decission boundrary configuration the number of false positives
+        self.false_negative_count = None # shape [n_thresholds, (label_bigger: false/true), n_objects, n_layers, n_neurons] ->
+        self.performance_train = None # [n_objects, n_layers, n_neurons] -> performance with the optimal threshold for that neuron
+
+        if allow_selectivity_by_being_off:
+            self.label_bigger_dict  = {0: False, 1: True}
+        else:
+            self.label_bigger_dict  = {0: True}
+
+
+
+    def fit(self, firing_rate, label, n_steps=100):
+        """
+        fit a decision boundrary for each object for each label
+        :param firing_rate: numpy array of shape [n_stimuli, n_layers, n_neurons]
+        :param label: binary numpy array of shape [n_objects, n_stimuli] => weather or not this object is present in that stimuli
+        :return: performance on the training set of shape [n_objects, n_layers, n_neurons]
+        """
+        n_stimuli, self.n_layers, self.n_neurons = firing_rate.shape
+        self.n_objects, _n_stimuli = label.shape
+        assert(_n_stimuli == n_stimuli)
+
+        self.false_negative_count = np.zeros((n_steps, len(self.label_bigger_dict), self.n_objects, self.n_layers, self.n_neurons))
+        self.false_positive_count = np.zeros_like(self.false_negative_count)
+        self.performance_train = np.zeros((self.n_objects, self.n_layers, self.n_neurons))
+        self.thresholds = np.zeros_like(self.performance_train)
+        self.label_bigger = np.zeros_like(self.performance_train, dtype=bool)
+
+        min_fr = np.min(firing_rate)
+        max_fr = np.max(firing_rate)
+
+
+        all_possible_thresholds = np.linspace(min_fr, max_fr, n_steps)
+
+
+        tmp_prediction = np.zeros_like(firing_rate, dtype=bool)
+
+        for threshold_i, threshold in enumerate(all_possible_thresholds):
+            # try all thresholds
+            for bigger_i, label_bigger in self.label_bigger_dict.items():
+                # all threshold directions
+                tmp_prediction[ firing_rate >  threshold] = label_bigger
+                tmp_prediction[ firing_rate <= threshold] = not label_bigger
+
+                # for all objects at a time
+                tmp_prediction_all_objects_same = np.tile(tmp_prediction, (self.n_objects, 1, 1, 1)) # since it does not matt
+
+                self.false_negative_count[threshold_i, bigger_i, :, :, :] = self.get_false_negative_count(tmp_prediction_all_objects_same, label)
+                self.false_positive_count[threshold_i, bigger_i, :, :, :] = self.get_false_positive_count(tmp_prediction_all_objects_same, label)
+
+
+
+        # find optimal boundrary
+
+        performance = self.perfomance_measure(false_positive_count=self.false_positive_count, false_negative_count=self.false_negative_count, label=label)
+        best_threshold_performances_both_sides = np.max(performance, axis=0) #optimal threshold [(label_bigger: (false,true), n_objects, n_layers, n_neurons
+
+        best_threshold_direction = np.argmax(best_threshold_performances_both_sides, axis=0) # n_objects, n_layers, n_neurons
+        best_threshold_performances = np.max(best_threshold_performances_both_sides, axis=0)
+
+
+
+        for o in range(self.n_objects):
+            for l in range(self.n_layers):
+                for n in range(self.n_neurons):
+
+                    performance_this = best_threshold_performances[o, l, n]
+                    label_bigger_index = best_threshold_direction[o, l, n]
+
+                    self.performance_train[o, l, n] = performance_this
+                    best_thresholds = all_possible_thresholds[performance[:, label_bigger_index, o, l, n] == performance_this] # given object, layer, neuron all thresholds that had this performance (with the right threshold polarity i.e. label_bigger_index)
+
+                    median_best_thresholds = np.percentile(best_thresholds, 50, interpolation='nearest')
+                    self.thresholds[o, l, n]   = median_best_thresholds
+                    self.label_bigger[o, l, n] = self.label_bigger_dict[label_bigger_index]
+
+        return self.performance_train
+
+
+
+    def perfomance_measure(self, false_positive_count, false_negative_count, label=None):
+        n_objects, n_stimuli = label.shape
+        return 1 - ((false_negative_count + false_positive_count)/ n_stimuli)
+
+    def transform(self, firing_rates):
+        """
+        Calculate boolean array with predictions for each stimulus.
+
+        Note if a neuron always has firing rate zero in the training it will always predict the same truth value for all objects.
+
+        :param firing_rates: of shape [n_stimuli, n_layers, n_neurons]
+        :return: boolean array of shape [n_objects, n_stimuli, n_layers, n_neurons]
+        """
+        n_stimuli, n_layers, n_neurons = firing_rates.shape
+        if self.thresholds is None:
+            raise RuntimeError("You have to train first")
+
+
+        result = np.zeros((self.n_objects, n_stimuli, n_layers, n_neurons), dtype=bool)
+
+        for o in range(self.n_objects):
+            for s in range(n_stimuli):
+                thresholds_this = self.thresholds[o, :, :] # [n_layers, n_neurons]
+                # thresholds_this_tiled = np.tile(thresholds_this, (n_stimuli, 1, 1)) # threshold is the same for each stimulus
+                upper_half = firing_rates[s, :, :] > thresholds_this
+                lower_half = np.invert(upper_half)
+
+                result[o, s][upper_half] = self.label_bigger[o][upper_half]
+                result[o, s][lower_half] = np.invert(self.label_bigger[o][lower_half])
+
+        return result
+
+    def performance(self, predictions, label):
+        """
+        Calculate the performance of the thing
+
+        :param predictions: boolean array of shape [n_objects, n_stimuli, n_layers, n_neurons]
+        :param label: boolean array of shape [n_objects, n_stimuli]
+        :return: np array of shape [n_objects, n_layers, n_neurons] -> value of the performance
+        """
+
+        fp = self.get_false_positive_count(predictions, label)
+        fn = self.get_false_negative_count(predictions, label)
+
+        return self.perfomance_measure(false_positive_count=fp, false_negative_count=fn, label=label)
+
+    def get_false_positive_count(self, prediction, label):
+        """
+        :param prediction:  numpy array of shape [n_objects, n_stimuli, n_layers, n_neurons]
+        :param label: [n_objects, n_stimuli]
+        :return: np array of shape [n_objects, n_layers, n_neurons] -> false positive count of that neuron for that object
+        """
+        label = np.expand_dims(np.expand_dims(label, 2), 3)
+        false_positive = np.invert(label) & prediction
+        false_positive_count = np.count_nonzero(false_positive, axis=1)
+        return false_positive_count.astype(int)
+
+    def get_false_negative_count(self, prediction, label):
+        """
+
+        :param prediction:  numpy array of shape [n_objects, n_stimuli, n_layers, n_neurons]
+        :param label: [n_objects, n_stimuli]
+        :return: np array of shape [n_objects, n_layers, n_neurons] -> false negative count of that neuron for that object
+        """
+        label = np.expand_dims(np.expand_dims(label, 2), 3)
+        false_negative = label & np.invert(prediction)
+        false_negative_count = np.count_nonzero(false_negative, axis=1)
+        return false_negative_count.astype(int)

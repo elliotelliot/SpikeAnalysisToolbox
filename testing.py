@@ -302,8 +302,92 @@ def test_paths_to_neuron():
     bla = synapse_analysis.paths_to_neurons([-3485], synapses, 0.9, max_path_length=3)
     return bla
 
+def test_trace_to_gabor():
+    path = "/Users/clemens/Documents/Code/ModelClemens/output/01_19-18_02_rounded_trained_after_random_pretraining/multi_e275"
+
+    network_architecture = dict(num_inh_neurons_per_layer=32 * 32, num_exc_neurons_per_layer=64 * 64, num_layers=4)
+    synapses = data.load_network(path, True, True)
+    mask = synapse_analysis.Synapse_Mask(network_architecture, synapses)
+
+    e2e_ff = mask.exc_feed_forward()
+
+    bt = synapse_analysis.BackTracer(synapses, network_architecture, percentage_thresholds=[0.1, 0.1, 0.1, 0.1], mask=e2e_ff)
+
+    result = bt.trace_back(3, 32, 32)
+    return result
+
+
+def shuffle_weight(path):
+    # path = "/Users/clemens/Documents/Code/ModelClemens/output/11_29-01_52_white_circle_l_vs_r_ALS_smallSTDP/initial"
+    network_architecture = dict(num_inh_neurons_per_layer=32 * 32, num_exc_neurons_per_layer=64 * 64, num_layers=4)
+    synapses = data.load_network(path, True, True)
+
+    new_weights = synapse_analysis.shuffle_weights_within_layer(synapses, network_architecture, 128**2)
+
+    raw_new_weights = new_weights.weights.values
+    raw_new_weights.tofile("{}/shuffled_weights.bin".format(path))
+    # return new_weights
+
+def test_single_cell_decoder():
+    path = "/Users/clemens/Documents/Code/ModelClemens/output"
+    experiment = "12_27-18_57_all_no_trace"
+    extension = "testing/epoch300"
+
+    object_list = data.load_testing_stimuli_indices_from_wildcarts(path + "/" + experiment, ["***l", "***r"])
+    print(object_list)
+    object_indices = [o['indices'] for o in object_list]
+    print(object_indices)
+    n_stimuli = np.sum([o['count'] for o in object_list])
+
+    label_for_classifier = np.zeros((2, n_stimuli), dtype=bool)
+    for i, o in enumerate(object_list):
+        label_for_classifier[i, o['indices']]= True
+
+
+    label_for_classifier_from_data_loading = data.load_testing_stimuli_label_matrix(path + "/" + experiment, ["***l", "***r"])
+    assert(np.all(label_for_classifier == label_for_classifier_from_data_loading))
+
+    print(label_for_classifier)
+
+
+    network_architecture = dict(
+        num_exc_neurons_per_layer=64 * 64,
+        num_inh_neurons_per_layer=32 * 32,
+        num_layers=4
+    )
+
+    info_times = dict(
+        length_of_stimulus=2.0,
+        num_stimuli=n_stimuli,
+        time_start=1.5,
+        time_end=1.9
+    )
+
+
+    spikes = data.load_spikes_from_subfolders(path, [experiment], [extension], False)
+
+    rates_subfolders = firing.calculate_rates_subfolder(
+        spikes,
+        network_architecture,
+        info_times)
+
+    exc_rates, inh_rates = helper.nested_list_of_stimuli_2_np(rates_subfolders[0][0])
+
+    dec = info.SingleCellDecoder()
+    perf_train = dec.fit(exc_rates, label_for_classifier)
+
+    prediction = dec.transform(exc_rates)
+
+    perf_test = dec.performance(prediction, label_for_classifier)
+    assert(np.all(perf_train == perf_test))
+    print("done")
 
 
 
-wc = test_paths_to_neuron()
+
+
+# wc = test_paths_to_neuron()
 # net, w = test_network_loading()
+# nw = test_weight_suffeling()
+# test_single_cell_decoder()
+p = test_trace_to_gabor()

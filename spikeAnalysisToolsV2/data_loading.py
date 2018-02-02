@@ -18,7 +18,7 @@ Args:
 Returns:
     pandas data frame with columns "ids" and "times" for the neuron id and spike time
 """
-def pandas_load_spikes(pathtofolder, binaryfile, input_neurons=False):
+def pandas_load_spikes(pathtofolder, binaryfile=True, input_neurons=False):
     ids, times = get_spikes(pathtofolder=pathtofolder, binaryfile=binaryfile, input_neurons=input_neurons)
     return pd.DataFrame({"ids": ids, "times": times})
 
@@ -234,7 +234,7 @@ def load_weights_all_epochs(basic_path, epoch_indices, epoch_folder="testing", i
     if type(epoch_indices[0]) == int:
         print("Epochs given as indices")
         all_epoch_paths = [basic_path + epoch_folder + "/epoch{}".format(e) for e in epoch_indices]
-    if type(epoch_indices[0]) == str:
+    elif type(epoch_indices[0]) == str:
         print("Epochs given by subfodler names")
         all_epoch_paths = [basic_path + "/" + epoch_name for epoch_name in epoch_indices]
     else:
@@ -316,11 +316,40 @@ def random_label_from_testing_list(experiment_folder, n_objects):
     Assumes that in the experiment folder there is a file called testing_list.txt. In this one the stimuli are presented in order multiple times
     i.e. all stimuli in fixed order, line with star, again all stimuli in the same order, line with star, etc.
     These stimuli will then be assigned random objects. (n_objects many of them)
-,
+    ,
     :param n_objects: how many objects we want
     :param experiment_folder: folder with the file testing_list.txt
     :return: list of lists, [object][stimulus] -> index of the stimulus for the object
     """
+
+    stim_ids = load_testing_stimuli_ids(experiment_folder)
+    stim_names = list(stim_ids.keys())
+
+    assert((len(stim_names)%n_objects) == 0)
+
+    n_stim_per_obj = len(stim_names) // n_objects
+
+    import random
+    random.shuffle(stim_names)
+
+    collector_objects = list()
+
+    for obj in range(n_objects):
+        start_id = obj * (n_stim_per_obj)
+        end_id = start_id + n_stim_per_obj
+
+        collector_stimuli_in_objects = list()
+
+        for stim_name in stim_names[start_id:end_id]:
+            collector_stimuli_in_objects.extend(stim_ids[stim_name])
+
+        collector_objects.append(collector_stimuli_in_objects)
+
+    return collector_objects
+
+def _deprecated_random_label_from_testing_list(experiment_folder, n_objects):
+    raise DeprecationWarning("use random_label_from_testing_list")
+
     repeats = load_testing_stimuli_info(experiment_folder)
     # in the original folder there is a star after each presentation of all objects. each entry in this list is a 'virtual'
     # object containing all stimuli
@@ -352,6 +381,24 @@ def load_testing_stimuli_names(experiment_folder):
             else:
                 cur_obj += 1
     return collector
+
+def load_testing_stimuli_ids(experiment_folder):
+    """
+    :param experiment_folder:
+    :return: dict with stimulus name as key and all the indices of this stimulus as list of ints under that key
+    """
+    cur_stim_idx = 0
+    collector = dict()
+    with open(experiment_folder + "/testing_list.txt", "r") as file:
+        for line in file:
+            raw_text = line.strip()
+            if raw_text != "*":
+                indices_so_far = collector.get(raw_text, list())
+                indices_so_far.append(cur_stim_idx)
+                collector[raw_text] = indices_so_far
+                cur_stim_idx += 1
+    return collector
+
 
 
 def load_testing_stimuli_indices_from_wildcarts(experiment_folder, objects):
@@ -405,6 +452,60 @@ def load_testing_stimuli_indices_from_wildcarts(experiment_folder, objects):
 
 
     return result
+
+
+def load_testing_stimuli_label_matrix(experiment_folder, objects):
+    """
+    objects are specified with wildcarts. e.g. 1*cl is the object containing all stimuli
+    with loc=1, type=circle, position=l but arbitrary color.
+
+    If there are multiple objects according to the naming convention 1bcl_2bcl it is enough if one of them satisfies the wildcard
+
+    e.g. 1**l would be a right border at location one neuron
+
+    :param experiment_folder: path to the folder containting testing_list.txt
+    :param objects: list of strings of type 1wcl (loc, color, type, pos)
+    :return: numpy array of shape [n_objects, n_stimuli] -> true if the stimulus contains an object specified by the corresponding wildcard
+    """
+    n_objects = len(objects)
+
+    #### HELPER CLASS
+    class Object_Filter:
+        def __init__(self, filter_string):
+            """filter_string for example 1*wcl"""
+            self.constraints = [(i, value) for i, value in enumerate(filter_string) if value != "*"]
+
+        def check_object_string(self, object_string):
+            """check if an object_string (e.g. 1b*l fullfills the requirements"""
+            for ind, val in self.constraints:
+                if object_string[ind] != val:
+                    return False # one constraint was violated
+            return True # went through all the constraints without a problem.
+
+        def __call__(self, stimulus_name):
+            for s in stimulus_name.split("_"):
+                if self.check_object_string(s):
+                    return True # one is enough
+            return False # none of the present objects satified the wildcard
+    ### END HELPER CLASS
+
+    all_filter = [Object_Filter(filter_string) for filter_string in objects]
+
+    collector = list()
+
+    with open(experiment_folder + "/testing_list.txt", "r") as file:
+        for line in file:
+            raw_text = line.strip()
+
+
+            if raw_text != "*":
+                current_stimulus = np.zeros((n_objects, 1), dtype=bool)
+                for fil_id, filter in enumerate(all_filter):
+                    if filter(raw_text): #stimulus part of object fil_id
+                        current_stimulus[fil_id, 0] = True
+                collector.append(current_stimulus)
+
+    return np.concatenate(collector, axis=1)
 
 
 

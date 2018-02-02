@@ -222,6 +222,8 @@ def id_to_position_input(id, n_layer, side_length):
 
     layer = id // n_per_layer
 
+    assert(layer <  n_layer)
+
     id_within_layer = id - (n_per_layer * layer)
 
     x = id_within_layer // side_length
@@ -362,5 +364,50 @@ def random_label(n_objects, n_transforms, n_repeats):
 
     return [list(l) for l in all_presentations_np] # unpack the numpy into a list of lists
 
+def object_list_2_boolean_label(object_list):
+    """
+    Transform object list to boolean label numpy array as used by the SingleCellDecoder class
+    :param object_list: list of dictionaries. each is one object and contains the fields 'count' and 'indices'
+    :return: numpy array of shape [n_objects, n_stimuli] -> True if the object is present in that stimulus
+    """
+    n_objects = len(object_list)
+    n_stimuli = np.sum([o['count'] for o in object_list])
+
+    label_for_classifier = np.zeros((n_objects, n_stimuli), dtype=bool)
+
+    for i, o in enumerate(object_list):
+        label_for_classifier[i, o['indices']] = True
+
+    return label_for_classifier
+
+def bool_label_matrix_to_mutually_exclusive_ids(bool_array):
+    """
+    Function to convert a boolean label matrix as the SingleCellDecoder uses to a list of stimulus ids (by object) as
+    single cell information uses
+
+    :param bool_array: numpy array of type boolean with shape [n_objects, n_stimuli]
+    :return: list containing n_object lists. each of which contains the ids of the stimuli in that object
+    :raise: ValueError if there is a stimulus that is part of multiple objects
+    """
+
+    assert(bool_array.dtype == bool)
+
+    n_obj, n_stim = bool_array.shape
+
+    # check that the objects are mutually exclusive
+    n_obj_that_stimulus_is_part_of = np.count_nonzero(bool_array, axis=0)
+    if np.any(n_obj_that_stimulus_is_part_of > 1):
+        raise ValueError("A stimulus was part of multiple objects")
+
+    # stimuli_that_are_part_of_object = (n_obj_that_stimulus_is_part_of == 1)
+
+    print("{} stimuli are not part of an object".format(np.count_nonzero(n_obj_that_stimulus_is_part_of == 0)))
+
+    collector = list()
+    for o in range(n_obj):
+        current_object = list(np.where(bool_array[o, :])[0])
+        collector.append(current_object)
+
+    return collector
 
 

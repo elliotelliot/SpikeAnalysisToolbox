@@ -258,7 +258,7 @@ def plot_information_measure_advancement(before, after, n_to_plot = 1000, item_l
             layerAX.legend()
 
 
-def plot_ranked_neurons(list_of_things, title, n_to_plot=100, item_label=None, vmin=0.0, vmax=None):
+def plot_ranked_neurons(list_of_things, title, n_to_plot=100, item_label=None, vmin=None, vmax=None):
     """
     Plot ranked neuron value. there will be as many subplots as layer. each contains as many lines as there are things
     value of first line at x=5 is the value of the 5th best neuron (with respect to the first thing)
@@ -281,6 +281,8 @@ def plot_ranked_neurons(list_of_things, title, n_to_plot=100, item_label=None, v
 
     if vmax is None:
         vmax = np.max(sorted_stuff)
+    if vmin is None:
+        vmin = np.min(sorted_stuff)
 
 
     fig = plt.figure(figsize=(15, 8))
@@ -337,8 +339,12 @@ def plot_fr_ranked(nested_firing_rates, stimulus_names = None, ylim=150, percent
     :param nested_firing_rates: firing rates for one epoch (multiple stimuli though)
     :return:
     """
-
-    excitatory_rates, inhibitory_rates = helper.nested_list_of_stimuli_2_np(nested_firing_rates)
+    if type(nested_firing_rates) != np.ndarray:
+        excitatory_rates, inhibitory_rates = helper.nested_list_of_stimuli_2_np(nested_firing_rates)
+    else:
+        print("PITA: only one numpy array given, inhibitory rates are fake")
+        excitatory_rates = nested_firing_rates
+        inhibitory_rates = np.zeros_like(excitatory_rates)
 
     num_stimuli, num_layers, num_neurons = excitatory_rates.shape
 
@@ -505,6 +511,114 @@ def plot_firing_rates_colored_by_object(firing_rates, object_list, title_string)
 
     ax.legend()
 
+
+def plot_mean_rates_by_stim(firing_rates, stimulus_ids, title_string, ylims=(0, 60), threshold=None, initial_rates=None):
+    """
+    Make plot with labeled stimulus on x axis and firing rate on y axis. then each stimulus presentations is ploted by one marker and an error bar
+    Optinally the firing rates untrained can be plotted too.
+
+    :param firing_rates:
+    :param stimulus_ids: dict with stimulus_name: list of indices at which that stimulus was presented
+    :param title_string:
+    :param initial_rates: same shape as firing_rates. if this is provided two rates will be plotted
+    :return:
+    """
+    if len(firing_rates.shape) != 1:
+        raise ValueError("firing_rates has to be a single 'timecourse' of firing rates. only one neuron (or the mean) at a time")
+
+    if initial_rates is not None:
+        list_of_rates = [firing_rates, initial_rates]
+        rates_label = ["Trained Network", "Initial_network"]
+    else:
+        list_of_rates = [firing_rates]
+        rates_label = [None]
+
+
+
+
+    fig = plt.figure(figsize=(13, 7))
+    fig.suptitle(title_string)
+    ax = fig.add_subplot(1,1,1)
+    ax.set_title("Firing Rates for Stimulus presentations, colored by object which contains the indicated stimuli")
+
+    x_axis = np.arange(len(stimulus_ids.keys()))
+
+    for i, rates in enumerate(list_of_rates):
+        mean_fr = np.zeros(len(stimulus_ids.keys()))
+        error_fr = np.zeros_like(mean_fr)
+        x_ticks = list()
+
+        for stim_nr, (stim_name, presentation_ids) in enumerate(stimulus_ids.items()):
+            x_ticks.append((stim_nr, stim_name))
+
+            mean_fr[stim_nr] = np.mean(rates[presentation_ids], axis=0)
+            error_fr[stim_nr] = np.std(rates[presentation_ids], axis=0)
+
+        ax.scatter(x_axis+(0.1*i), mean_fr, marker='x', label=rates_label[i])
+        ax.errorbar(x_axis+(0.1*i), mean_fr, yerr=error_fr, fmt='none')
+
+    if rates_label:
+        ax.legend()
+
+    if threshold:
+        ax.axhline(y=threshold, ls=":", c="black")
+
+    ax.set_ylim(*ylims)
+
+    x_tick_pos, x_tick_string = zip(*x_ticks)
+
+    plt.xticks(x_tick_pos, x_tick_string, rotation=45)
+
+    ax.legend()
+
+
+
+
+
+def plot_firing_rates_by_stim(firing_rates, stimulus_ids, title_string, mean_with_errorbar=False, color_indices=None, ylims=(0, 60), threshold=None):
+    """
+    Make plot with labeled stimulus on x axis and firing rate on y axis. then each stimulus presentations is ploted by one marker in a scatter plot
+
+    :param firing_rates:
+    :param stimulus_ids: dict with stimulus_name: list of indices at which that stimulus was presented
+    :param title_string:
+    :return:
+    """
+    if len(firing_rates.shape) != 1:
+        raise ValueError("firing_rates has to be a single 'timecourse' of firing rates. only one neuron (or the mean) at a time")
+
+
+    colors = 'r'
+    if color_indices:
+        colors = np.zeros_like(firing_rates)
+        for i, one_color_obj in enumerate(color_indices):
+            colors[one_color_obj] = i
+
+    x_axis = np.zeros_like(firing_rates)
+    x_ticks = list()
+    for stim_nr, (stim_name, presentation_ids) in enumerate(stimulus_ids.items()):
+        x_axis[presentation_ids] = stim_nr+1
+        x_ticks.append((stim_nr+1, stim_name))
+
+
+    fig = plt.figure(figsize=(10, 7))
+    fig.suptitle(title_string)
+    ax = fig.add_subplot(1,1,1)
+    ax.set_title("Firing Rates for Stimulus presentations, colored by object which contains the indicated stimuli")
+
+    ax.scatter(x_axis, firing_rates, marker='x', c=colors)
+
+    if threshold:
+        ax.axhline(y=threshold)
+
+    ax.set_ylim(*ylims)
+
+    x_tick_pos, x_tick_string = zip(*x_ticks)
+
+    plt.xticks(x_tick_pos, x_tick_string, rotation=45)
+
+    ax.legend()
+
 def plot_firing_rates_std_vs_mean_colored_by_object(firing_rates, object_list, title_string):
     """
     within a set of neurons (usually a layer) the mean fr and the std of it is computed and plotted
@@ -534,6 +648,62 @@ def plot_firing_rates_std_vs_mean_colored_by_object(firing_rates, object_list, t
     ax.set_ylabel("Mean Firing Rate")
     ax.set_xlabel("Standard diviation of Firing Rate")
     ax.legend()
+
+def plot_value_comparisson(name_a, value_a, name_b,  value_b, object_label=None, title="", threshold_a=None, threshold_b=None, vmax=1, vmin=0):
+    """
+    Make n_layer many
+    Two accis scatter plot to compare values of a and b. y axis is value of a for that neuron, x axis is value of b for that neuron
+
+    :param value_a: np.array of shape [n_objects, n_layers, n_neurons]
+    :param value_b: same as value_a
+    :param threshold_a: scalar, only neurons who's a value is above this will be considered
+    :param threshold_b: scala, only neurons who's b value is above this will be considered
+    :return:
+    """
+    assert(value_a.shape == value_b.shape)
+
+    n_objects, n_layers, n_neurons = value_a.shape
+    n_rows = np.ceil(n_layers/2)
+
+    if threshold_a is None:
+        threshold_a = np.min(value_a)
+    if threshold_b is None:
+        threshold_b = np.min(value_b)
+
+    if object_label is None:
+        object_label = ["Object {}".format(o) for o in range(n_objects)]
+    else:
+        assert(n_objects == len(object_label))
+
+
+
+    fig = plt.figure(figsize=(13, 13))
+    fig.suptitle(title)
+
+    for l in range(n_layers):
+        ax = fig.add_subplot(n_rows, 2, l+1)
+
+        cor = np.corrcoef((value_a[:, l].flatten()), value_b[:, l].flatten())
+
+        ax.set_title("Layer {}, correlation: {}".format(l, cor[0, 1]))
+
+        for o in range(n_objects):
+            mask = (value_a[o, l, :] >= threshold_a) & (value_b[o, l, :] >= threshold_b)
+            selected_a = value_a[o, l][mask]
+            selected_b = value_b[o, l][mask]
+            ax.scatter(selected_b, selected_a, marker=".", label=object_label[o], s=5)
+            ax.plot([vmin, vmax], [vmin, vmax], ls=":", c="black")
+
+        ax.set_ylim(vmin, vmax)
+        ax.set_xlim(vmin, vmax)
+        ax.set_xlabel(name_b)
+        ax.set_ylabel(name_a)
+        ax.legend()
+
+
+
+
+
 
 
 def animated_histogram(data, n_bins=10, item_label=None, log=True):
@@ -575,6 +745,7 @@ def animated_histogram(data, n_bins=10, item_label=None, log=True):
 
     ani = animation.FuncAnimation(fig, update_hist, n_epochs)
     return ani
+
 
 
 def plot_development_for_object(values, title, object_labels=None):
