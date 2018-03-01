@@ -190,7 +190,7 @@ def single_cell_information(freq_table):
 
 
 # @jit(cache=True)
-def firing_rates_to_single_cell_information(firing_rates, objects, n_bins, calc_inhibitory=False):
+def firing_rates_to_single_cell_information(firing_rates, objects, n_bins=3, calc_inhibitory=False):
    """
    Single Cell information
    :param firing_rates: nested list of shape [stimulus][layer][exc/inh] -> pandas dataframe with fields "ids", "firing_rate"
@@ -364,7 +364,7 @@ class SingleCellDecoder(object):
 
         self.false_positive_count = None # shape [n_thresholds, (label_bigger: false/true), n_objects, n_layers, n_neurons] -> for each decission boundrary configuration the number of false positives
         self.false_negative_count = None # shape [n_thresholds, (label_bigger: false/true), n_objects, n_layers, n_neurons] ->
-        self.performance_train = None # [n_objects, n_layers, n_neurons] -> performance with the optimal threshold for that neuron
+        self.accuracy_train = None # [n_objects, n_layers, n_neurons] -> performance with the optimal threshold for that neuron
 
         if allow_selectivity_by_being_off:
             self.label_bigger_dict  = {0: False, 1: True}
@@ -384,11 +384,11 @@ class SingleCellDecoder(object):
         self.n_objects, _n_stimuli = label.shape
         assert(_n_stimuli == n_stimuli)
 
-        self.false_negative_count = np.zeros((n_steps, len(self.label_bigger_dict), self.n_objects, self.n_layers, self.n_neurons))
-        self.false_positive_count = np.zeros_like(self.false_negative_count)
-        self.performance_train = np.zeros((self.n_objects, self.n_layers, self.n_neurons))
-        self.thresholds = np.zeros_like(self.performance_train)
-        self.label_bigger = np.zeros_like(self.performance_train, dtype=bool)
+        false_negative_count = np.zeros((n_steps, len(self.label_bigger_dict), self.n_objects, self.n_layers, self.n_neurons))
+        false_positive_count = np.zeros_like(false_negative_count)
+        self.accuracy_train = np.zeros((self.n_objects, self.n_layers, self.n_neurons))
+        self.thresholds = np.zeros_like(self.accuracy_train)
+        self.label_bigger = np.zeros_like(self.accuracy_train, dtype=bool)
 
         min_fr = np.min(firing_rate)
         max_fr = np.max(firing_rate)
@@ -409,14 +409,14 @@ class SingleCellDecoder(object):
                 # for all objects at a time
                 tmp_prediction_all_objects_same = np.tile(tmp_prediction, (self.n_objects, 1, 1, 1)) # since it does not matt
 
-                self.false_negative_count[threshold_i, bigger_i, :, :, :] = self.get_false_negative_count(tmp_prediction_all_objects_same, label)
-                self.false_positive_count[threshold_i, bigger_i, :, :, :] = self.get_false_positive_count(tmp_prediction_all_objects_same, label)
+                false_negative_count[threshold_i, bigger_i, :, :, :] = PerformanceSummary.get_false_negative_count(tmp_prediction_all_objects_same, label)
+                false_positive_count[threshold_i, bigger_i, :, :, :] = PerformanceSummary.get_false_positive_count(tmp_prediction_all_objects_same, label)
 
 
 
         # find optimal boundrary
 
-        performance = self.perfomance_measure(false_positive_count=self.false_positive_count, false_negative_count=self.false_negative_count, label=label)
+        performance = self.performance_measure(false_positive_count=false_positive_count, false_negative_count=false_negative_count, label=label)
         best_threshold_performances_both_sides = np.max(performance, axis=0) #optimal threshold [(label_bigger: (false,true), n_objects, n_layers, n_neurons
 
         best_threshold_direction = np.argmax(best_threshold_performances_both_sides, axis=0) # n_objects, n_layers, n_neurons
@@ -431,20 +431,14 @@ class SingleCellDecoder(object):
                     performance_this = best_threshold_performances[o, l, n]
                     label_bigger_index = best_threshold_direction[o, l, n]
 
-                    self.performance_train[o, l, n] = performance_this
+                    self.accuracy_train[o, l, n] = performance_this
                     best_thresholds = all_possible_thresholds[performance[:, label_bigger_index, o, l, n] == performance_this] # given object, layer, neuron all thresholds that had this performance (with the right threshold polarity i.e. label_bigger_index)
 
                     median_best_thresholds = np.percentile(best_thresholds, 50, interpolation='nearest')
                     self.thresholds[o, l, n]   = median_best_thresholds
                     self.label_bigger[o, l, n] = self.label_bigger_dict[label_bigger_index]
 
-        return self.performance_train
-
-
-
-    def perfomance_measure(self, false_positive_count, false_negative_count, label=None):
-        n_objects, n_stimuli = label.shape
-        return 1 - ((false_negative_count + false_positive_count)/ n_stimuli)
+        return self.accuracy_train
 
     def transform(self, firing_rates):
         """
@@ -474,21 +468,75 @@ class SingleCellDecoder(object):
 
         return result
 
-    def performance(self, predictions, label):
+    def get_performance_summary(self, firing_rates, label):
         """
-        Calculate the performance of the thing
+        Calculate boolean array with predictions for each stimulus.
 
-        :param predictions: boolean array of shape [n_objects, n_stimuli, n_layers, n_neurons]
-        :param label: boolean array of shape [n_objects, n_stimuli]
-        :return: np array of shape [n_objects, n_layers, n_neurons] -> value of the performance
+        Note if a neuron always has firing rate zero in the training it will always predict the same truth value for all objects.
+
+        :param firing_rates: of shape [n_stimuli, n_layers, n_neurons]
+        """
+        predictions = self.transform(firing_rates)
+        return PerformanceSummary(predictions, label)
+
+    def performance_measure(self, false_positive_count, false_negative_count, label):
+        n_objects, n_stimuli = label.shape
+        return 1 - ((false_negative_count + false_positive_count) / n_stimuli)
+
+
+class PerformanceSummary:
+
+    def __init__(self, predictions, label):
+        """
+        This Class is used to callculate all kinds of performance measures from a prediction and Labels
+        :param predictions: np bool array of shape (objects, stimuli, layer, neurons)
+        :param label: np bool array of shape (objects, stimuli)
+        """
+        assert(predictions.dtype == np.bool)
+        assert(label.dtype == np.bool)
+        assert(label.shape == predictions.shape[:2])
+
+        self.predictions = predictions
+        self.label = label
+
+        self.n_examples = label.shape[1]
+
+        self.n_class_positive = np.expand_dims(np.expand_dims(np.count_nonzero(label, axis=1), 1), 1) # for each object: in how many stimuli was it present
+        self.n_class_negative = np.expand_dims(np.expand_dims(np.count_nonzero(np.invert(label), axis=1),1),1)
+
+        self.n_false_positive = self.get_false_positive_count(self.predictions, self.label)
+        self.n_true_negative = self.n_class_negative - self.n_false_positive # n_class_negative = true_negative + false_positive
+
+        self.n_false_negative = self.get_false_negative_count(self.predictions, self.label)
+        self.n_true_positive = self.n_class_positive - self.n_false_negative # n_class_true = false_negative + true_positive
+
+
+    def accuracy(self):
+        """How many of the examples were predicted correctly
+        :return: np array of shape [n_objects, n_layer, n_neuron] -> accuracy of that neuron
+        """
+        return (self.n_true_negative + self.n_true_positive) / self.n_examples
+
+    def precission(self):
+        """How many of the stimuli precited as positive are in fact true positive
+        :return: np array of shape [n_objects, n_layer, n_neuron] -> accuracy of that neuron
         """
 
-        fp = self.get_false_positive_count(predictions, label)
-        fn = self.get_false_negative_count(predictions, label)
+        result =  self.n_true_positive / (self.n_true_positive + self.n_false_positive)
 
-        return self.perfomance_measure(false_positive_count=fp, false_negative_count=fn, label=label)
+        result[self.n_true_positive == 0] = 0
+        return result
 
-    def get_false_positive_count(self, prediction, label):
+    def recall(self):
+        """
+        How many stimuli that are in fact positive, will be predicted as positive
+
+        :return: np array of shape [n_objects, n_layer, n_neuron] -> accuracy of that neuron
+        """
+        return self.n_true_positive / (self.n_class_positive)
+
+    @classmethod
+    def get_false_positive_count(cls, prediction, label):
         """
         :param prediction:  numpy array of shape [n_objects, n_stimuli, n_layers, n_neurons]
         :param label: [n_objects, n_stimuli]
@@ -499,9 +547,9 @@ class SingleCellDecoder(object):
         false_positive_count = np.count_nonzero(false_positive, axis=1)
         return false_positive_count.astype(int)
 
-    def get_false_negative_count(self, prediction, label):
+    @classmethod
+    def get_false_negative_count(cls, prediction, label):
         """
-
         :param prediction:  numpy array of shape [n_objects, n_stimuli, n_layers, n_neurons]
         :param label: [n_objects, n_stimuli]
         :return: np array of shape [n_objects, n_layers, n_neurons] -> false negative count of that neuron for that object

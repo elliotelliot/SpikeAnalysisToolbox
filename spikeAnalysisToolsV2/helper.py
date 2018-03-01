@@ -90,6 +90,19 @@ def neuron_target_column_to_numpy_array(data, target_column, network_architectur
 
     return result_exc, result_inh
 
+def take_multiple_elements_from_list(input_list, ids):
+    """
+    Take multiple elements indexed by ids out of input_list
+    :param input_list: list of arbitrary elemtns
+    :param ids: list of integers
+    :return: [obj for obj, i in enumerate(input_list) if i in ids]
+    """
+    result = list()
+    for i in ids:
+        result.append(input_list[i])
+    return result
+
+
 
 
 def id_to_position(id, network_info, pos_as_2d=True):
@@ -410,4 +423,125 @@ def bool_label_matrix_to_mutually_exclusive_ids(bool_array):
 
     return collector
 
+
+def ids_to_bool_array(ids):
+    """
+    Converts a list of ids as needed for classic single cell information to a matrix of bools as needed for the single cell decoder
+    :param ids: nested array of objects, each object is a list of corresponding ids [[2,3,4,5],[0,1,6,7]]
+    :return: numpy array of shape (n_stims, n_objects)
+    """
+    n_stims = max_of_nested_array(ids) + 1
+    n_objs  = len(ids)
+
+    matrix = np.zeros((n_objs, n_stims), dtype=bool)
+
+    for obj_id, obj in enumerate(ids):
+        matrix[obj_id, obj] = True
+
+    return matrix
+
+
+def max_of_nested_array(arr):
+    """rekursivly compute the maximum number in a arbitrary nested structure of arrays"""
+    if type(arr) != list:
+        return arr
+    else:
+        return max([max_of_nested_array(i) for i in arr])
+
+
+def split_into_populations(neuron_values, network_architecture_info, population_name="L{layer}_{type}"):
+    """
+    Split pandas dataframe of neurons into neuron populations. A popluation is all neurons of one type (excitatory or inhibitory)
+    within one layer.
+
+    :param neuron_values: pandas dataframe with column "ids" and arbitrary additional columns
+    :param network_architecture_info: dict with fields "num_exc_neurons_per_layer", "num_inh_neurons_per_layer", "num_layers"
+    :return: dictionary with population_name as key (e.g. L0_exc) and pandas dataframe with same columns as neuron_values as value
+    """
+    result=dict()
+
+    neuron_mask = NeuronMask(network_architecture_info)
+
+    neuron_ids = neuron_values.ids.values
+
+    for layer in range(network_architecture_info["num_layers"]):
+
+        # excitatory
+        name = population_name.format(layer=layer, type="exc")
+        mask = neuron_mask.is_in_layer(neuron_ids, layer) & neuron_mask.is_excitatory(neuron_ids)
+        values = neuron_values[mask]
+        result[name] = values
+
+        # inhibitory
+        name = population_name.format(layer=layer, type="inh")
+        mask = neuron_mask.is_in_layer(neuron_ids, layer) & neuron_mask.is_inhibitory(neuron_ids)
+        values = neuron_values[mask]
+        result[name] = values
+
+    return result
+
+
+
+
+
+class NeuronMask:
+    def __init__(self, network_architecture_info):
+        """
+        Class that provides masks for a given network
+        Each function returns a boolean array that is true where the neuron is of the correct type
+        """
+
+        self.n_exc = network_architecture_info["num_exc_neurons_per_layer"]
+        self.n_inh = network_architecture_info["num_inh_neurons_per_layer"]
+        self.total_per_layer = self.n_exc + self.n_inh
+        self.n_layer = network_architecture_info["num_layers"]
+
+        self.n_all_neurons = self.total_per_layer * self.n_layer
+
+        self.last_exc = self.n_exc
+
+    def _check_if_in_input_layer(self, neuron_ids):
+        if np.any(neuron_ids < 0):
+            raise NotImplementedError("Does not work for input neurons at the moment")
+
+    def is_in_layer(self, neuron_ids, layer):
+        """returns boolean array of shape neuron_ids which is true for each neuron_id that is in the layer"""
+        self._check_if_in_input_layer(neuron_ids)
+
+        return (neuron_ids // self.total_per_layer) == layer
+
+    def _id_within_layer(self, neuron_ids):
+        return neuron_ids % self.total_per_layer
+
+    def is_excitatory(self, neuron_ids):
+        self._check_if_in_input_layer(neuron_ids)
+        ids_within_layer = self._id_within_layer(neuron_ids)
+        return ids_within_layer < self.n_exc
+
+
+    def is_inhibitory(self, neuron_ids):
+        self._check_if_in_input_layer(neuron_ids)
+        ids_within_layer = self._id_within_layer(neuron_ids)
+        return ids_within_layer >= self.n_exc
+
+    def get_ids_of_random_neurons_of_type(self, n_to_draw, restricting_functions = None):
+        """
+        Draw ids of random neurons that fullfill certain criteria
+        :param n_to_draw: how many neurons to draw
+        :param restricting_functions: list of functions that take a numpy array as input and return a boolean array of same shape as restrictions on the neurons. e.g. self.is_excitatory
+
+        :return: numpy array of length n_to_draw
+        """
+        entire_pool = np.arange(0, self.n_all_neurons)
+
+        neurons_left = entire_pool
+
+        if restricting_functions:
+            if type(restricting_functions) != list:
+                restricting_functions = [restricting_functions]
+
+            for fun in restricting_functions:
+                neurons_left = neurons_left[fun(neurons_left)]
+
+        return np.random.choice(neurons_left, n_to_draw, replace=False)
 

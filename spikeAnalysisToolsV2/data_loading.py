@@ -284,7 +284,6 @@ def load_stimulus_file_to_attribute_matrix(filename, attributes):
 
 
 
-
 def load_testing_stimuli_info(experiment_folder):
     """
     load the information about the stimuli presented during testing. There is assumed to be a file "testing_list.txt" with the information in the experiment_folder
@@ -310,6 +309,7 @@ def load_testing_stimuli_info(experiment_folder):
 
     proper_objects = [obj for obj in objects if obj['count'] != 0]
     return proper_objects
+
 
 def random_label_from_testing_list(experiment_folder, n_objects):
     """
@@ -382,7 +382,12 @@ def load_testing_stimuli_names(experiment_folder):
                 cur_obj += 1
     return collector
 
-def load_testing_stimuli_ids(experiment_folder):
+def load_testing_stimuli_ids(*args, **kwargs):
+    import warnings
+    warnings.warn("Use the function load_testing_stimuli_dict instead of this one", DeprecationWarning)
+    return load_testing_stimuli_dict(*args, **kwargs)
+
+def load_testing_stimuli_dict(experiment_folder):
     """
     :param experiment_folder:
     :return: dict with stimulus name as key and all the indices of this stimulus as list of ints under that key

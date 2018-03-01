@@ -23,7 +23,8 @@ import spikeAnalysisToolsV2.combine_stimuli as combine
 import spikeAnalysisToolsV2.plotting as spikeplot
 import spikeAnalysisToolsV2.information_scores as info
 import spikeAnalysisToolsV2.synapse_analysis as synapse_analysis
-
+import spikeAnalysisToolsV2.polychron as poly
+import spikeAnalysisToolsV2.oscilations as oscilations
 
 
 
@@ -376,11 +377,81 @@ def test_single_cell_decoder():
     dec = info.SingleCellDecoder()
     perf_train = dec.fit(exc_rates, label_for_classifier)
 
-    prediction = dec.transform(exc_rates)
+    perf_sumary = dec.get_performance_summary(exc_rates, label_for_classifier)
 
-    perf_test = dec.performance(prediction, label_for_classifier)
+    perf_test = perf_sumary.accuracy()
+
     assert(np.all(perf_train == perf_test))
+    print(perf_train == perf_test)
     print("done")
+
+
+def test_spike_correlations():
+    path = "/Users/clemens/Documents/Code/ModelClemens/output"
+    experiment = "01_11-15_00_long_test_with_trace"
+    extension = "trained_e285"
+
+    stimuli_ids = data.load_testing_stimuli_dict(path + "/" + experiment + "/" + extension)
+
+    network_architecture = dict(
+        num_exc_neurons_per_layer=64 * 64,
+        num_inh_neurons_per_layer=32 * 32,
+        num_layers=4
+    )
+
+    neuron_mask = helper.NeuronMask(network_architecture)
+
+    synapses = data.load_network(path + "/" + experiment + "/" + extension)
+
+    spikes = data.load_spikes_from_subfolders(path, [experiment], [extension], False)
+
+    seperated = helper.splitstimuli(spikes[0][0], 2)
+
+    selected = helper.take_multiple_elements_from_list(seperated, stimuli_ids["1wcl"])
+
+    pre_ids = neuron_mask.get_ids_of_random_neurons_of_type(200, neuron_mask.is_excitatory)
+
+    pre_ids = np.sort(pre_ids)
+
+    target_id = helper.position_to_id((1, 19, 10), True, network_architecture)
+    target_id = 10400
+
+    hist, times = poly.histogram_for_incoming_synapses(selected, target_id, synapses, 0.0002, 0.01, 1)
+
+    print(spikes)
+
+
+def test_oscilation_fitter():
+    path = "/Users/clemens/Documents/Code/ModelClemens/output"
+    experiment = "01_11-15_00_long_test_with_trace"
+    extension = "trained_e285"
+
+    stimuli_ids = data.load_testing_stimuli_dict(path + "/" + experiment + "/" + extension)
+
+    network_architecture = dict(
+        num_exc_neurons_per_layer=64 * 64,
+        num_inh_neurons_per_layer=32 * 32,
+        num_layers=4
+    )
+
+    neuron_mask = helper.NeuronMask(network_architecture)
+
+    synapses = data.load_network(path + "/" + experiment + "/" + extension)
+
+    spikes = data.load_spikes_from_subfolders(path, [experiment], [extension], False)[0][0]
+
+    # seperated = helper.splitstimuli(spikes, 2)
+
+    pops = helper.split_into_populations(spikes, network_architecture)
+    print(pops)
+
+    times, activity = oscilations.population_activity(pops["L0_exc"], (1, 2))
+
+    print(activity)
+    plt.plot(times, activity)
+    plt.show()
+
+
 
 
 
@@ -390,4 +461,7 @@ def test_single_cell_decoder():
 # net, w = test_network_loading()
 # nw = test_weight_suffeling()
 # test_single_cell_decoder()
-p = test_trace_to_gabor()
+# p = test_trace_to_gabor()
+
+# test_spike_correlations()
+test_oscilation_fitter()

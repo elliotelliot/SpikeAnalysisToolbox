@@ -512,7 +512,7 @@ def plot_firing_rates_colored_by_object(firing_rates, object_list, title_string)
     ax.legend()
 
 
-def plot_mean_rates_by_stim(firing_rates, stimulus_ids, title_string, ylims=(0, 60), threshold=None, initial_rates=None):
+def plot_mean_rates_by_stim(firing_rates, stimulus_ids, title_string, ylims=(0, 60), threshold=None, comparison_rates=None, rates_label=None):
     """
     Make plot with labeled stimulus on x axis and firing rate on y axis. then each stimulus presentations is ploted by one marker and an error bar
     Optinally the firing rates untrained can be plotted too.
@@ -520,17 +520,20 @@ def plot_mean_rates_by_stim(firing_rates, stimulus_ids, title_string, ylims=(0, 
     :param firing_rates:
     :param stimulus_ids: dict with stimulus_name: list of indices at which that stimulus was presented
     :param title_string:
-    :param initial_rates: same shape as firing_rates. if this is provided two rates will be plotted
+    :param comparison_rates: same shape as firing_rates. if this is provided two rates will be plotted. The names will be given by rate_labels
+    :param rate_labels: tuple with two elemnts which are the labels for (firing_rates, comparison_rates) respectivly.
     :return:
     """
     if len(firing_rates.shape) != 1:
         raise ValueError("firing_rates has to be a single 'timecourse' of firing rates. only one neuron (or the mean) at a time")
 
-    if initial_rates is not None:
-        list_of_rates = [firing_rates, initial_rates]
-        rates_label = ["Trained Network", "Initial_network"]
+    if comparison_rates is not None:
+        list_of_rates = [firing_rates, comparison_rates]
+        if rates_label is None:
+            rates_label = ["Trained Network", "Initial_network"]
     else:
         list_of_rates = [firing_rates]
+        assert(rates_label is None)
         rates_label = [None]
 
 
