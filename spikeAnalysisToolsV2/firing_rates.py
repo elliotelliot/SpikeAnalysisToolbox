@@ -94,7 +94,6 @@ def spikes_to_instantanious_FR(spikes, neuron_range, time_step, time_range=None)
 
     id_time_tuple_array = np.stack([spike_ids, int_spike_times], axis= 0)
     # shape (2, n_spikes) first row is the ids, second is the times
-    #
 
     id_time_pairs, occurance_count = np.unique(id_time_tuple_array, return_counts=True, axis=1)
     # will count the number of occurances of the same columns (because axis 1) which represents a specific neuron spiking at a specific time

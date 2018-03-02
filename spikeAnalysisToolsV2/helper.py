@@ -482,6 +482,58 @@ def split_into_populations(neuron_values, network_architecture_info, population_
 
 
 
+def permute_ids_within_population(neuron_ids, network_architecture_info):
+    """
+    ranomdly permute the ids, such that only id's within a population can change places.
+    I.e. after permuting, the neuron_id in each position in the array will belong to the same population
+    that the neuron_id value at that position in the array belonged to before the permutation.
+
+    :param neuron_ids: numpy array of integer ids of neurons. (for exaple taken from spikes.ids.values)
+    :param network_architecture_info: dict with fields "num_exc_neurons_per_layer", "num_inh_neurons_per_layer", "num_layers"
+    :return: numpy array of same shape as neuron_ids with permuted ids
+    """
+
+    neuron_mask = NeuronMask(network_architecture_info)
+
+    result = np.ones_like(neuron_ids) * np.nan
+
+
+    for layer in range(network_architecture_info["num_layers"]):
+
+        # excitatory
+        mask = neuron_mask.is_in_layer(neuron_ids, layer) & neuron_mask.is_excitatory(neuron_ids)
+        result[mask] = np.random.permutation(neuron_ids[mask])
+
+        # inhibitory
+        mask = neuron_mask.is_in_layer(neuron_ids, layer) & neuron_mask.is_inhibitory(neuron_ids)
+        result[mask] = np.random.permutation(neuron_ids[mask])
+
+    assert(not np.any(np.isnan(result)))
+    return result
+
+
+def get_popluation_id(neuron_id, network_architecture):
+    """
+    For the given neuron_id, give the population id as
+    exc_neuron: layer_nr * 10 + 1
+    inh_neuron: layer_nr * 10 + 1 + 1
+
+    :param neuron_id: global neuron_id (or numpy array of them)
+    :param network_architecture: dict
+    :return: population_id of popluation that the neuron belongs to (or numpy arrray of them)
+    """
+
+    mask = NeuronMask(network_architecture)
+
+    layer_ids = mask.get_layer_nr(neuron_id)
+    is_inhibitory = mask.is_inhibitory(neuron_id)
+
+    pop_ids = layer_ids * 10 + is_inhibitory.astype(int) + 1
+
+    return pop_ids
+
+
+
 
 
 class NeuronMask:
@@ -508,7 +560,12 @@ class NeuronMask:
         """returns boolean array of shape neuron_ids which is true for each neuron_id that is in the layer"""
         self._check_if_in_input_layer(neuron_ids)
 
-        return (neuron_ids // self.total_per_layer) == layer
+        return self.get_layer_nr(neuron_ids) == layer
+
+
+    def get_layer_nr(self, neuron_ids):
+        return (neuron_ids // self.total_per_layer)
+
 
     def _id_within_layer(self, neuron_ids):
         return neuron_ids % self.total_per_layer

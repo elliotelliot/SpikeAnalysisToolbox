@@ -407,18 +407,26 @@ def test_spike_correlations():
 
     seperated = helper.splitstimuli(spikes[0][0], 2)
 
-    selected = helper.take_multiple_elements_from_list(seperated, stimuli_ids["1wcl"])
-
-    pre_ids = neuron_mask.get_ids_of_random_neurons_of_type(200, neuron_mask.is_excitatory)
-
-    pre_ids = np.sort(pre_ids)
+    selected = helper.take_multiple_elements_from_list(seperated, stimuli_ids["1wcr"])
 
     target_id = helper.position_to_id((1, 19, 10), True, network_architecture)
-    target_id = 10400
+    target_id = 9186
 
-    hist, times = poly.histogram_for_incoming_synapses(selected, target_id, synapses, 0.0002, 0.01, 1)
+    # pre_ids = neuron_mask.get_ids_of_random_neurons_of_type(200, neuron_mask.is_excitatory)
+    pre_ids = synapses.pre.values[synapses.post.values == target_id]
 
-    print(spikes)
+    pre_ids = np.sort(np.unique(pre_ids))
+
+    normed_hist, times = poly.population_normalised_pre_spike_hist(stimuli_spikes=selected, target_neuron=target_id, max_time_delay=0.2,
+                                             time_step=0.002, network_architecture=network_architecture,
+                                             preneurons=pre_ids, start_time=1.0, multiple_spikes_per_bin_possible=True)
+
+    hist_new, times = poly.pre_spike_hist(stimuli_spikes=selected, target_neuron=target_id, max_time_delay=0.2, time_step=0.1, preneurons=pre_ids, start_time=1.0, multiple_spikes_per_bin_possible=True)
+    hist_old, times = poly.pre_spike_hist(stimuli_spikes=selected, target_neuron=target_id, max_time_delay=0.02, time_step=0.1, preneurons=pre_ids, start_time=1.0, multiple_spikes_per_bin_possible=False)
+
+    assert(np.all(hist_new >= hist_old))
+
+    print(hist_new.shape)
 
 
 def test_oscilation_fitter():
@@ -463,5 +471,5 @@ def test_oscilation_fitter():
 # test_single_cell_decoder()
 # p = test_trace_to_gabor()
 
-# test_spike_correlations()
-test_oscilation_fitter()
+test_spike_correlations()
+# test_oscilation_fitter()
