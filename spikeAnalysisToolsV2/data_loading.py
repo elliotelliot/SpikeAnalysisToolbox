@@ -459,7 +459,7 @@ def load_testing_stimuli_indices_from_wildcarts(experiment_folder, objects):
     return result
 
 
-def load_testing_stimuli_label_matrix(experiment_folder, objects):
+def load_testing_stimuli_label_matrix(experiment_folder, objects, multi_object_delimiter="_"):
     """
     objects are specified with wildcarts. e.g. 1*cl is the object containing all stimuli
     with loc=1, type=circle, position=l but arbitrary color.
@@ -470,6 +470,7 @@ def load_testing_stimuli_label_matrix(experiment_folder, objects):
 
     :param experiment_folder: path to the folder containting testing_list.txt
     :param objects: list of strings of type 1wcl (loc, color, type, pos)
+    :param multi_object_delimiter: char (if there are multiple objects in a stimulus the filename should contain <attributes one stim><multi_object_delimiter><attributes other stim> e.g. 1wcl_2bcl
     :return: numpy array of shape [n_objects, n_stimuli] -> true if the stimulus contains an object specified by the corresponding wildcard
     """
     n_objects = len(objects)
@@ -488,7 +489,7 @@ def load_testing_stimuli_label_matrix(experiment_folder, objects):
             return True # went through all the constraints without a problem.
 
         def __call__(self, stimulus_name):
-            for s in stimulus_name.split("_"):
+            for s in stimulus_name.split(multi_object_delimiter):
                 if self.check_object_string(s):
                     return True # one is enough
             return False # none of the present objects satified the wildcard
