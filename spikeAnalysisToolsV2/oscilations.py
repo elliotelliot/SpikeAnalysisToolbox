@@ -121,8 +121,49 @@ def fit_sinus_peaks(population_act, times):
 
     return peaks_in_time_range
 
+def spikes_rel_to_population_peaks(population_spikes, population_peaks, neuron_range):
+    assert(np.all(population_spikes.times.values[:-1] <= population_spikes.times.values[1:]))
+
+    start_neuron_id, end_neuron_id = neuron_range
+
+    result = np.zeros((end_neuron_id - start_neuron_id, len(population_peaks)))
+
+    # first_spike, last_spike = np.min(population_spikes.times.values), np.max(population_spikes.times.values)
+
+    inter_peak_midles = (population_peaks[1:] + population_peaks[:-1])/2
+
+    first_oscilation_start = population_peaks[0] - (inter_peak_midles[0] - population_peaks[0])
+    last_oscilation_end    = population_peaks[-1] + (population_peaks[-1] - inter_peak_midles[-1])
+
+    oscilation_edges = np.insert(inter_peak_midles, [0, len(inter_peak_midles)], [first_oscilation_start, last_oscilation_end])
+
+    for i, peak_time in enumerate(population_peaks):
+        oscilation_start = oscilation_edges[i]
+        oscilation_end   = oscilation_edges[i+1]
+        start_spike_id, end_spike_id = np.searchsorted(population_spikes.times.values, [oscilation_start, oscilation_end])
+
+        spikes_in_oscilation = population_spikes.iloc[start_spike_id: end_spike_id]
+
+        # why Reverse?
+        # we are only interested in the first spike of a neuron in the population peak
+        # but we will set all the values for all spikes in the result array. so with reversing we first set the value for the latest spike
+        # then second latest and so on, always overwritting the privious value, only the last *value* we set, will be kept
+        # which will be the timing of the first spike, since we reversed.
+        # hacky but should be fast
+
+        spike_ids_reverse = spikes_in_oscilation.ids.values[::-1]
+        spike_ids_reverse_relative = spike_ids_reverse - start_neuron_id
+
+        spike_times_reverse = spikes_in_oscilation.times.values[::-1]
+        spike_times_reverse_relative_to_peak = spike_times_reverse - peak_time
 
 
-#TODO comput time between consecutive fitted activity peaks. mean squared error between that and 1/max_frex
+        assert(np.all(spike_ids_reverse_relative>=0))
+        result[spike_ids_reverse_relative, i] = spike_times_reverse_relative_to_peak
+
+    return result
+
+
+
 
 

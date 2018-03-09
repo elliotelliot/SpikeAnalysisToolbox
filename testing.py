@@ -430,8 +430,8 @@ def test_spike_correlations():
 
 
 def test_oscilation_fitter():
-    path = "/Users/clemens/Documents/Code/ModelClemens/output"
-    experiment ="03_06-12_46_long_test_smaller_syn_decay"
+    path = "/Users/shakti/Documents/OFTNAI/test_data"
+    # experiment ="03_06-12_46_long_test_smaller_syn_decay"
     experiment ="01_11-15_00_long_test_with_trace"
     extension = "trained_e285"
 
@@ -458,15 +458,20 @@ def test_oscilation_fitter():
 
     stimulus_id = 91
 
+    pop_name = "L0_exc"
 
-    times, activity = oscilations.population_activity(pops["L0_exc"], (2*stimulus_id + 1, 2*stimulus_id + 2), bin_width=4e-3)
+    times, activity = oscilations.population_activity(pops[pop_name], (2*stimulus_id + 1, 2*stimulus_id + 2), bin_width=4e-3)
 
     # activity = ssignal.convolve(activity, ssignal.gaussian(10, 1e-3/ 4e-3), mode='same')
 
-    # extrema = oscilations.fit_activity_peaks(activity, times)
+    peaks = oscilations.fit_activity_peaks(activity, times)
     # extrema = oscilations.fit_sinus_peaks(activity, times)
 
     # activity = 3 * np.cos(62 * times + 23)
+
+    neuron_ranges = helper.get_popluation_neuron_range(network_architecture)
+
+    peak_rel_spiketimes = oscilations.spikes_rel_to_population_peaks(pops[pop_name], peaks, neuron_ranges[pop_name])
 
 
     frex, exp, (frequencies, intensities) = oscilations.fit_fft(activity, times, smooth_win_hz=4)
@@ -474,7 +479,6 @@ def test_oscilation_fitter():
 
     plt.figure()
     plt.plot(frequencies, intensities)
-
 
     # print(activity)
     plt.figure()

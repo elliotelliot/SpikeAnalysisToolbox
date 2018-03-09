@@ -500,6 +500,32 @@ def split_into_populations(neuron_values, network_architecture_info, population_
 
     return result
 
+def get_popluation_neuron_range(network_architecture_info, population_name="L{layer}_{type}"):
+    n_layer = network_architecture_info["num_layers"]
+    n_inh = network_architecture_info["num_inh_neurons_per_layer"]
+    n_exc = network_architecture_info["num_exc_neurons_per_layer"]
+
+    n_total_per_layer = n_inh + n_exc
+
+    result= dict()
+
+    for layer in range(n_layer):
+
+        # excitatory
+        name = population_name.format(layer=layer, type='exc')
+        exc_start = n_total_per_layer * layer
+        exc_end = exc_start + n_exc
+        result[name] = (exc_start, exc_end)
+
+        # inhibitory
+        name = population_name.format(layer=layer, type="inh")
+        inh_start = n_total_per_layer * layer + n_exc
+        inh_end = inh_start + n_inh
+        result[name] = (inh_start, inh_end)
+
+    return result
+
+
 
 
 def permute_ids_within_population(neuron_ids, network_architecture_info):
