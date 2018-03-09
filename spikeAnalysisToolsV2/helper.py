@@ -10,16 +10,36 @@ Args:
 Returns:
     spikes_per_stimulus: a list of pandas data frames with spikes and times
 """
-def splitstimuli(spikes, stimduration):
+def splitstimuli(spikes, stimduration, spikes_can_be_modified=True):
     assert ("ids" in spikes)
     assert ("times" in spikes)
+
+
+    assert(np.all(spikes.times.values[:-1] <= spikes.times.values[1:]))
+
     num_stimuli = int(np.ceil(np.max(spikes.times) / stimduration))
 
     spikes_per_stimulus = list()
 
+    if spikes_can_be_modified:
+        print("Original spike times were modified during spliting into stimulus")
+
     for i in range(num_stimuli):
-        mask = (spikes.times > (i * stimduration)) & (spikes.times < ((i + 1) * stimduration))
-        spikes_in_stim = spikes[mask].copy()
+        # mask = (spikes.times > (i * stimduration)) & (spikes.times < ((i + 1) * stimduration))
+
+        start_id, end_id = np.searchsorted(spikes.times, [i*stimduration, (i+1) * stimduration])
+
+        spikes_in_stim_slice = spikes.iloc[start_id:end_id]
+
+        if spikes_can_be_modified:
+            spikes_in_stim = spikes_in_stim_slice
+        else:
+            spikes_in_stim = spikes_in_stim_slice.copy()
+
+        # spikes_in_stim = spikes[mask].copy()
+
+        # assert(np.all(spikes_in_stim == spikes_in_stim_new))
+
         spikes_in_stim.times -= (i * stimduration)
         spikes_per_stimulus.append(spikes_in_stim)
 

@@ -431,10 +431,11 @@ def test_spike_correlations():
 
 def test_oscilation_fitter():
     path = "/Users/clemens/Documents/Code/ModelClemens/output"
-    experiment = "01_11-15_00_long_test_with_trace"
+    experiment ="03_06-12_46_long_test_smaller_syn_decay"
+    experiment ="01_11-15_00_long_test_with_trace"
     extension = "trained_e285"
 
-    stimuli_ids = data.load_testing_stimuli_dict(path + "/" + experiment + "/" + extension)
+    # stimuli_ids = data.load_testing_stimuli_dict(path + "/" + experiment + "/" + extension)
 
     network_architecture = dict(
         num_exc_neurons_per_layer=64 * 64,
@@ -442,9 +443,9 @@ def test_oscilation_fitter():
         num_layers=4
     )
 
-    neuron_mask = helper.NeuronMask(network_architecture)
+    # neuron_mask = helper.NeuronMask(network_architecture)
 
-    synapses = data.load_network(path + "/" + experiment + "/" + extension)
+    # synapses = data.load_network(path + "/" + experiment + "/" + extension)
 
     spikes = data.load_spikes_from_subfolders(path, [experiment], [extension], False)[0][0]
 
@@ -453,11 +454,44 @@ def test_oscilation_fitter():
     pops = helper.split_into_populations(spikes, network_architecture)
     print(pops)
 
-    times, activity = oscilations.population_activity(pops["L0_exc"], (1, 2))
+    # import scipy.signal as ssignal
 
-    print(activity)
+    stimulus_id = 91
+
+
+    times, activity = oscilations.population_activity(pops["L0_exc"], (2*stimulus_id + 1, 2*stimulus_id + 2), bin_width=4e-3)
+
+    # activity = ssignal.convolve(activity, ssignal.gaussian(10, 1e-3/ 4e-3), mode='same')
+
+    # extrema = oscilations.fit_activity_peaks(activity, times)
+    # extrema = oscilations.fit_sinus_peaks(activity, times)
+
+    # activity = 3 * np.cos(62 * times + 23)
+
+
+    frex, exp, (frequencies, intensities) = oscilations.fit_fft(activity, times, smooth_win_hz=4)
+
+
+    plt.figure()
+    plt.plot(frequencies, intensities)
+
+
+    # print(activity)
+    plt.figure()
     plt.plot(times, activity)
+
+    # compute sinus
+    # sin_y =  scale * np.cos(frex * times * 2 * np.pi + offset)
+
+    exp_y = np.exp(2j * np.pi * times * frex) * exp
+
+    # plt.plot(times, sin_y)
+    plt.plot(times, exp_y)
+    # for ex in extrema:
+    #     plt.axvline(ex, c='r')
+
     plt.show()
+    print('done')
 
 
 
@@ -471,5 +505,5 @@ def test_oscilation_fitter():
 # test_single_cell_decoder()
 # p = test_trace_to_gabor()
 
-test_spike_correlations()
-# test_oscilation_fitter()
+# test_spike_correlations()
+out = test_oscilation_fitter()

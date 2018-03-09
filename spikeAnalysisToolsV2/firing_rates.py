@@ -67,6 +67,7 @@ def spikes_to_instantanious_FR(spikes, neuron_range, time_step, time_range=None)
     assert ('ids' in spikes)
     assert ('times' in spikes)
 
+
     neuron_start, neuron_end = neuron_range
     mask = (neuron_start <= spikes.ids) & (spikes.ids < neuron_end)
 
@@ -98,7 +99,7 @@ def spikes_to_instantanious_FR(spikes, neuron_range, time_step, time_range=None)
     id_time_pairs, occurance_count = np.unique(id_time_tuple_array, return_counts=True, axis=1)
     # will count the number of occurances of the same columns (because axis 1) which represents a specific neuron spiking at a specific time
 
-    ids_that_spiked = id_time_pairs[0, :]
+    ids_that_spiked = id_time_pairs[0, :] - neuron_start
     times_they_spiked = id_time_pairs[1, :] - t_start
     count_they_spiked = occurance_count
 
