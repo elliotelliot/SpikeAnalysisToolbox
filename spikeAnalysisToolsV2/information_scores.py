@@ -223,6 +223,22 @@ def firing_rates_numpy_to_single_cell_info(firing_rates, objects, n_bins=3):
     info = single_cell_information(table)
     return info
 
+
+def information_spike_pairs(spike_pair_histogram, objects, n_bins=3):
+    """
+    Calculate Information for spike pairs
+    :param spike_pair_histogram: numpy array of shape (n_stimuli, pre_neurons, post_neurons, delta_time)
+    :param objects: list of length (n_stimuli) with ids of objects
+    :param n_bins:
+    :return: numpy array of shape (n_objects, delta_time, pre_neurons*post_neurons)
+    """
+    n_stim, n_pre, n_post, n_delta_time = spike_pair_histogram.shape
+    reshaped_hist = np.moveaxis(spike_pair_histogram, 3, 1) # n_stimuli, delta_time, pre_neurons, post_neurons
+    fake_layerwise_hist = np.reshape(reshaped_hist, (n_stim, n_delta_time, n_pre * n_post))
+
+    info = firing_rates_numpy_to_single_cell_info(fake_layerwise_hist, objects, n_bins=n_bins)
+    return info
+
 def information_all_epochs(firing_rates_all_epochs, strategy, *args, **kwargs):
     """
     :param firing_rates_all_epochs: nested list of shape [epoch][stimulus][layer][excitatory/inhibitory] -> pandas dataframe with "ids" and "firing_rates"
@@ -326,6 +342,7 @@ def slow_information_all_epochs(firing_rates_all_epochs, objects, n_bins, calc_i
     # assert(np.all(exc_np == exc_np_fast))
 
     return exc_np, inh_np
+
 
 
 # TODO refactor Caller, such that it first makes the numpy tensor, then applyies some normalisation then calls the information measures for exc (and maybe inhibitory)

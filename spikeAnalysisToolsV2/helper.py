@@ -10,14 +10,15 @@ Args:
 Returns:
     spikes_per_stimulus: a list of pandas data frames with spikes and times
 """
-def splitstimuli(spikes, stimduration, spikes_can_be_modified=True):
+def splitstimuli(spikes, stimduration, spikes_can_be_modified=True, num_stimuli=None):
     assert ("ids" in spikes)
     assert ("times" in spikes)
 
 
     assert(np.all(spikes.times.values[:-1] <= spikes.times.values[1:]))
 
-    num_stimuli = int(np.ceil(np.max(spikes.times) / stimduration))
+    if num_stimuli is None:
+        num_stimuli = int(np.ceil(np.max(spikes.times) / stimduration))
 
     spikes_per_stimulus = list()
 
@@ -480,27 +481,34 @@ def split_into_populations(neuron_values, network_architecture_info, population_
     """
     result=dict()
 
-    neuron_mask = NeuronMask(network_architecture_info)
+    # neuron_mask = NeuronMask(network_architecture_info)
+    #
+    # neuron_ids = neuron_values.ids.values
+    #
+    # for layer in range(network_architecture_info["num_layers"]):
+    #
+    #     # excitatory
+    #     name = population_name.format(layer=layer, type="exc")
+    #     # mask = neuron_mask.is_in_layer(neuron_ids, layer) & neuron_mask.is_excitatory(neuron_ids)
+    #
+    #     values = neuron_values[mask]
+    #     result[name] = values
+    #
+    #     # inhibitory
+    #     name = population_name.format(layer=layer, type="inh")
+    #     # mask = neuron_mask.is_in_layer(neuron_ids, layer) & neuron_mask.is_inhibitory(neuron_ids)
+    #     values = neuron_values[mask]
+    #     result[name] = values
 
-    neuron_ids = neuron_values.ids.values
-
-    for layer in range(network_architecture_info["num_layers"]):
-
-        # excitatory
-        name = population_name.format(layer=layer, type="exc")
-        mask = neuron_mask.is_in_layer(neuron_ids, layer) & neuron_mask.is_excitatory(neuron_ids)
-        values = neuron_values[mask]
-        result[name] = values
-
-        # inhibitory
-        name = population_name.format(layer=layer, type="inh")
-        mask = neuron_mask.is_in_layer(neuron_ids, layer) & neuron_mask.is_inhibitory(neuron_ids)
-        values = neuron_values[mask]
-        result[name] = values
+    pop_id_ranges = get_population_neuron_range(network_architecture_info, population_name)
+    for pop_name, id_range in pop_id_ranges.items():
+        start_id, end_id = id_range
+        mask = (start_id <= neuron_values.ids.values) & (neuron_values.ids.values < end_id)
+        result[pop_name] = neuron_values[mask]
 
     return result
 
-def get_popluation_neuron_range(network_architecture_info, population_name="L{layer}_{type}"):
+def get_population_neuron_range(network_architecture_info, population_name="L{layer}_{type}"):
     n_layer = network_architecture_info["num_layers"]
     n_inh = network_architecture_info["num_inh_neurons_per_layer"]
     n_exc = network_architecture_info["num_exc_neurons_per_layer"]
@@ -558,12 +566,34 @@ def permute_ids_within_population(neuron_ids, network_architecture_info):
     return result
 
 
+def get_population_name(neuron_id, network_architecture,  population_name_format="L{layer}_{type}"):
+    """
+    For the given neuron_id, give the population name
+
+    :param neuron_id: global neuron_id
+    :param network_architecture: dict
+    :param population_name_format: format string
+    :return: population_id of popluation that the neuron belongs to (or numpy arrray of them)
+    """
+
+    mask = NeuronMask(network_architecture)
+
+    layer_id = mask.get_layer_nr(neuron_id)
+    if mask.is_inhibitory(neuron_id):
+        neuron_type = "inh"
+    else:
+        neuron_type = "exc"
+
+    name = population_name_format.format(layer=layer_id, type=neuron_type)
+
+    return name
+
+
 def get_popluation_id(neuron_id, network_architecture):
     """
     For the given neuron_id, give the population id as
     exc_neuron: layer_nr * 10 + 1
     inh_neuron: layer_nr * 10 + 1 + 1
-
     :param neuron_id: global neuron_id (or numpy array of them)
     :param network_architecture: dict
     :return: population_id of popluation that the neuron belongs to (or numpy arrray of them)
@@ -579,6 +609,55 @@ def get_popluation_id(neuron_id, network_architecture):
     return pop_ids
 
 
+def histogram_along_axis(data, bins, axis):
+    """
+    Compute histogram of 2d array along specified axis.
+    for each column/line the histogram is computed seperatly but with the same bins
+
+    :param data: 2d numpy array
+    :param axis: axis along wich to compute the histogram. This axis will be replaced by a histogram
+    :param bins: 1d array of bin edges, or number of bins
+    :return: edges, histogram
+        edges: 1d numpy array of bin edges
+        histogram: 2d numpy array of same shape as data, but the axis specified will now contain the histogram
+    """
+    assert(len(data.shape)==2)
+    assert(axis in [0, 1])
+
+    different_data_axis = (axis+1) % 2
+
+    if type(bins) == int:
+        bins = np.linspace(np.nanmin(data), np.nanmax(data), bins)
+
+    data[np.isnan(data)] = np.nanmax(data)*2 # this way those values won't be inside the range defined by bins and will be ignored
+
+    result = list()
+
+    for l in range(data.shape[different_data_axis]):
+        elements = np.take(data, l, axis=different_data_axis)
+        hist, new_bins = np.histogram(elements, bins)
+
+        assert(np.all(new_bins == bins))
+        hist_2d = np.expand_dims(hist, different_data_axis)
+        result.append(hist_2d)
+
+    return bins, np.concatenate(result, axis=different_data_axis)
+
+
+class Caller(object):
+    def __init__(self, function, *args, **kwargs):
+        """
+        when you call an instance of this object with obj(input) it will call function(input, *args)
+
+        :param function:  the function that should be called
+        :param args:  oter params that the function takes
+        :param kwargs:
+        """
+        self.function = function
+        self.args = args[:]
+        self.kwargs = kwargs.copy()
+    def __call__(self, input):
+        return self.function(input, *self.args, **self.kwargs)
 
 
 

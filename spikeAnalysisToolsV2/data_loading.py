@@ -377,7 +377,7 @@ def load_testing_stimuli_names(experiment_folder):
         for line in file:
             raw_text = line.strip()
             if raw_text != "*":
-                collector.append("obj{}:{}".format(cur_obj, raw_text))
+                collector.append("{}".format(raw_text))
             else:
                 cur_obj += 1
     return collector

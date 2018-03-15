@@ -498,7 +498,41 @@ def test_oscilation_fitter():
     print('done')
 
 
+def test_spike_pair_info():
+    path = "/Users/clemens/Documents/Code/ModelClemens/output"
+    # experiment ="03_06-12_46_long_test_smaller_syn_decay"
+    experiment ="01_11-15_00_long_test_with_trace"
+    extension = "trained_e285"
 
+    object_list = data.load_testing_stimuli_indices_from_wildcarts(path + "/" + experiment, ["***l", "***r"])
+    print(object_list)
+    # stimuli_ids = data.load_testing_stimuli_dict(path + "/" + experiment + "/" + extension)
+    object_indices = [o['indices'] for o in object_list]
+    n_stimuli = len(np.array(object_indices).flatten())
+    network_architecture = dict(
+        num_exc_neurons_per_layer=64 * 64,
+        num_inh_neurons_per_layer=32 * 32,
+        num_layers=4
+    )
+
+    # neuron_mask = helper.NeuronMask(network_architecture)
+
+    # synapses = data.load_network(path + "/" + experiment + "/" + extension)
+    neuron_range = (15860, 16000)
+
+    neuron_ids = np.arange(*neuron_range)
+
+    spikes = data.load_spikes_from_subfolders(path, [experiment], [extension], False)[0][0]
+    spikes = spikes[np.isin(spikes.ids.values, np.arange(*neuron_range))]
+
+    splitted_spikes = helper.splitstimuli(spikes, 2, num_stimuli=n_stimuli)
+
+    pair_info, t = poly.spike_pair_info(splitted_spikes, neuron_ids=neuron_ids, time_step=1e-3, max_time_delay=10e-3, start_time=1.0, n_bins_prob_table=3, object_indices=object_indices)
+    t_pair_info, t = poly.threaded_spike_pair_info(splitted_spikes, neuron_ids=neuron_ids, time_step=1e-3, max_time_delay=10e-3, start_time=1.0, n_bins_prob_table=3, object_indices=object_indices, n_threads=4, post_min_spike_count=0)
+
+    assert(np.all(t_pair_info==pair_info))
+
+    return pair_info
 
 
 
@@ -510,4 +544,5 @@ def test_oscilation_fitter():
 # p = test_trace_to_gabor()
 
 # test_spike_correlations()
-out = test_oscilation_fitter()
+# out = test_oscilation_fitter()
+res = test_spike_pair_info()

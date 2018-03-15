@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.signal as ssignal
+from . import helper
 
 def population_activity(spike_times, time_range = None, bin_width=2e-3, n_neurons=1):
     """
@@ -77,7 +78,7 @@ def fit_fft(population_act, times, smooth_win_hz=3):
 
     return max_frequency, faktor, (ft_frex, ft_intensity)
 
-def fit_activity_peaks(population_act, times, smooth_win=1e-3, min_peak_intensity=0.3):
+def fit_activity_peaks(population_act, times, smooth_win=1e-2, min_peak_intensity=0.3):
     """
     find maxima in population activity
     :param population_act: numpy array eg. from population_activity
@@ -122,11 +123,20 @@ def fit_sinus_peaks(population_act, times):
     return peaks_in_time_range
 
 def spikes_rel_to_population_peaks(population_spikes, population_peaks, neuron_range):
+    """
+    Within an oscilation compute a neurons first spike time relative to the peak of the oscilation. i.e. when the population is most active.
+    Each spike is assigned to the clossest population peak (in poulation_peaks) and for each peak the first spike time of a neuron is taken.
+
+    :param population_spikes: pandas dataframe with 'ids', and 'times'
+    :param population_peaks: 1-d numpy array with the times of population peaks. e.g. from oscilations.fit_activity_peaks
+    :param neuron_range: (start_id, end_id) ids of the neurons. all ids in population_spikes must be in this range
+    :return: numpy array of dimensions (n_neurons, n_population_peaks)
+    """
     assert(np.all(population_spikes.times.values[:-1] <= population_spikes.times.values[1:]))
 
     start_neuron_id, end_neuron_id = neuron_range
 
-    result = np.zeros((end_neuron_id - start_neuron_id, len(population_peaks)))
+    result = np.zeros((end_neuron_id - start_neuron_id, len(population_peaks)))*np.nan
 
     # first_spike, last_spike = np.min(population_spikes.times.values), np.max(population_spikes.times.values)
 
@@ -152,7 +162,7 @@ def spikes_rel_to_population_peaks(population_spikes, population_peaks, neuron_r
         # hacky but should be fast
 
         spike_ids_reverse = spikes_in_oscilation.ids.values[::-1]
-        spike_ids_reverse_relative = spike_ids_reverse - start_neuron_id
+        spike_ids_reverse_relative = (spike_ids_reverse - start_neuron_id).astype(int)
 
         spike_times_reverse = spikes_in_oscilation.times.values[::-1]
         spike_times_reverse_relative_to_peak = spike_times_reverse - peak_time
@@ -163,7 +173,62 @@ def spikes_rel_to_population_peaks(population_spikes, population_peaks, neuron_r
 
     return result
 
+def spikes_2_rel_oscilation_spikes(spikes, network_architecture, time_range):
+    """
+    Transform absolute spiketimes to times of the first spike in an oscilation relative to it's peak. Seperatly for each population
+    :param spikes: pandas with ids and times
+    :param network_architecture:
+    :param time_range: (start_time, end_time) time range whithin wich spikes will be transformed
+    :return: dict with population name as key and a numpy array of shape (n_neurons, n_peaks) as item
+    """
+    population_spikes = helper.split_into_populations(spikes, network_architecture)
+    population_ranges = helper.get_population_neuron_range(network_architecture)
+
+    all_rel_spikes = dict()
+
+    times = None
+    for pop_name, pop_spikes in population_spikes.items():
+        new_times, pop_activity = population_activity(pop_spikes, time_range=time_range)
+        if times is None:
+            times = new_times
+        else:
+            assert(np.all(times == new_times))
+
+        peaks = fit_activity_peaks(pop_activity, times)
+        rel_spikes = spikes_rel_to_population_peaks(population_spikes=pop_spikes, population_peaks=peaks, neuron_range=population_ranges[pop_name])
+
+        all_rel_spikes[pop_name] = rel_spikes
+
+    return all_rel_spikes
 
 
+
+
+def spikes_2_population_peaks(spikes, network_architecture, time_range):
+    """
+
+    :return:
+    """
+    populations = helper.split_into_populations(spikes, network_architecture)
+
+    # population activity
+    times = None
+    all_pop_activity = dict()
+    for pop_name, pop_spikes in populations.items():
+        new_times, pop_activity = population_activity(pop_spikes, time_range=time_range)
+        if times is None:
+            times = new_times
+        else:
+            assert(np.all(times == new_times))
+        all_pop_activity[pop_name] = pop_activity
+    # // population acitvity
+
+    # peaks
+    pop_peaks = dict()
+    for pop_name, pop_activity in all_pop_activity.items():
+        peaks = fit_activity_peaks(pop_activity, times, smooth_win=5e-2)
+        pop_peaks[pop_name] = peaks
+
+    return pop_peaks
 
 

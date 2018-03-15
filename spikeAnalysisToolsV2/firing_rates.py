@@ -307,10 +307,12 @@ def digitize_firing_rates_with_equispaced_bins(firing_rates, n_bins):
     :param n_bins:
     :return:
     """
+    smallest_representable_number =  np.finfo(firing_rates.dtype).eps
+
     n_stimuli, n_layer, n_neurons = firing_rates.shape
 
     minimal_response = np.min(firing_rates, axis=0)
-    maximal_response = np.max(firing_rates, axis=0) + 1 # + 1 cause the last one is <
+    maximal_response = (np.max(firing_rates, axis=0) * (1 + smallest_representable_number)) + smallest_representable_number
 
     categorized_firing_rates = np.empty((n_stimuli, n_layer, n_neurons), dtype=int)
 

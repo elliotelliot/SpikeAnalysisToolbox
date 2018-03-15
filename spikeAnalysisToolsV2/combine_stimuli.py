@@ -68,7 +68,7 @@ def min_responses(responses, list_of_objects):
 
 
 @jit(cache=True)
-def response_freq_table(firing_rates, objects, n_bins=10):
+def response_freq_table(firing_rates, objects, n_bins=3):
     """
     Combine multiple presenations (stimuli) of the same objects into a frequency table that gives you
     the probability of a certain response given an object (which might be present in one of its different transforms)
@@ -78,7 +78,6 @@ def response_freq_table(firing_rates, objects, n_bins=10):
     :param n_bins: how many different response types a neuron can have
     :return: numpy array of shape [object_id, layer, neuron, response_type] -> probability p(response = response_type | object = object_id)
     """
-
 
     digitized_fr = firing.digitize_firing_rates_with_equispaced_bins(firing_rates, n_bins=n_bins)
 
