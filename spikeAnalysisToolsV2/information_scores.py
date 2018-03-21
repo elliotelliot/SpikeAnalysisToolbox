@@ -211,7 +211,7 @@ def firing_rates_to_single_cell_information(firing_rates, objects, n_bins=3, cal
 
    return exc_info, inh_info
 
-def firing_rates_numpy_to_single_cell_info(firing_rates, objects, n_bins=3):
+def firing_rates_numpy_to_single_cell_info(firing_rates, objects, n_bins=3, allow_nan_as_seperate_bin=False):
     """
     Calculate single cell info for the given firing rates
     :param firing_rates: numpy array of shape [stimuli, layer, neuron]
@@ -219,7 +219,7 @@ def firing_rates_numpy_to_single_cell_info(firing_rates, objects, n_bins=3):
     :param n_bins:
     :return:
     """
-    table = combine.response_freq_table(firing_rates, objects, n_bins=n_bins)
+    table = combine.response_freq_table(firing_rates, objects, n_bins=n_bins, allow_nan_as_seperate_bin=allow_nan_as_seperate_bin)
     info = single_cell_information(table)
     return info
 

@@ -365,7 +365,7 @@ def plot_fr_ranked(nested_firing_rates, stimulus_names = None, ylim=150, percent
     fig_collector = list()
     for stimulus in range(num_stimuli):
         fig = plt.figure(figsize=(15, 7))
-        fig.suptitle("Stimulus: {}".format(stimulus_names[stimulus]), fontsize=16)
+        fig.suptitle("Stimulus: {} Nr {}".format(stimulus_names[stimulus], stimulus), fontsize=16)
 
         subpltEX = fig.add_subplot(1, 2, 1)
         plt.tight_layout(pad=8.0)

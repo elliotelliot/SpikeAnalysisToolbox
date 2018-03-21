@@ -67,8 +67,8 @@ def min_responses(responses, list_of_objects):
 
 
 
-@jit(cache=True)
-def response_freq_table(firing_rates, objects, n_bins=3):
+# @jit(cache=True)
+def response_freq_table(firing_rates, objects, n_bins=3, allow_nan_as_seperate_bin=False):
     """
     Combine multiple presenations (stimuli) of the same objects into a frequency table that gives you
     the probability of a certain response given an object (which might be present in one of its different transforms)
@@ -79,7 +79,7 @@ def response_freq_table(firing_rates, objects, n_bins=3):
     :return: numpy array of shape [object_id, layer, neuron, response_type] -> probability p(response = response_type | object = object_id)
     """
 
-    digitized_fr = firing.digitize_firing_rates_with_equispaced_bins(firing_rates, n_bins=n_bins)
+    digitized_fr = firing.digitize_firing_rates_with_equispaced_bins(firing_rates, n_bins=n_bins, allow_nan_as_seperate_bin=allow_nan_as_seperate_bin)
 
     n_stimuli, n_layer, n_neurons = firing_rates.shape
 
@@ -89,11 +89,12 @@ def response_freq_table(firing_rates, objects, n_bins=3):
         for l in range(n_layer):
             for n in range(n_neurons):
                 freq_table[object_id, l, n, :] = np.bincount(digitized_fr[belonging_stimuli, l, n], minlength=n_bins).astype(float)
+                # print(freq_table[object_id, l, n, :])
                 # on the right side we have a 1D array with one value for each stimulus
                 # that gets counted into as many bins as we have so we have (n_bins)
 
         freq_table[object_id, :, :, :] /= len(belonging_stimuli)
 
-    # assert(np.all(np.isclose(np.sum(freq_table, axis=3), 1)))
+    assert(np.all(np.isclose(np.sum(freq_table, axis=3), 1)))
 
     return freq_table

@@ -295,8 +295,8 @@ def randomly_draw_firing_rate_according_to_distribution(real_firing_rates, n_dif
     return fake_responses
 
 
-@jit(cache=True)
-def digitize_firing_rates_with_equispaced_bins(firing_rates, n_bins):
+# @jit(cache=True)
+def digitize_firing_rates_with_equispaced_bins(firing_rates, n_bins, allow_nan_as_seperate_bin=False):
     """
     Digitizes firing rates such that every firing rate has a value in [0, n_bins[
     For every neuron, the different firing rates for the different stimuli are divided into equally spaced bins. Stringer 2005
@@ -305,25 +305,36 @@ def digitize_firing_rates_with_equispaced_bins(firing_rates, n_bins):
 
     :param firing_rates:
     :param n_bins:
+    :param allow_nan_as_seperate_bin: if True there will be n_bins-1 'real' bins and one bin for all nan values. if False an error is raises if NAN is encountered
     :return:
     """
+
+    if np.any(np.isnan(firing_rates)):
+        if not allow_nan_as_seperate_bin:
+            raise ValueError("Firing rates must not contain NaN unless allow_nan_as_seperate_bin is set to true")
+        else:
+            n_real_bins = n_bins - 1 # the highest bin is now reserved for nan. nan vaues are placed in the highest bin by np.digitize
+    else:
+        n_real_bins = n_bins
+
+
     smallest_representable_number =  np.finfo(firing_rates.dtype).eps
 
     n_stimuli, n_layer, n_neurons = firing_rates.shape
 
-    minimal_response = np.min(firing_rates, axis=0)
-    maximal_response = (np.max(firing_rates, axis=0) * (1 + smallest_representable_number)) + smallest_representable_number
+    minimal_response = np.nanmin(firing_rates, axis=0)
+    maximal_response = (np.nanmax(firing_rates, axis=0) * (1 + smallest_representable_number)) + smallest_representable_number
 
     categorized_firing_rates = np.empty((n_stimuli, n_layer, n_neurons), dtype=int)
 
     for l in range(n_layer):
         for n in range(n_neurons):
-            bins = np.linspace(minimal_response[l, n], maximal_response[l, n], n_bins+1) # +1 because for n bin boundraries there are only n-1 buckets
+            bins = np.linspace(minimal_response[l, n], maximal_response[l, n], n_real_bins+1) # +1 because for n bin boundraries there are only n-1 buckets
             categorized_firing_rates[:, l, n] = np.digitize(firing_rates[:, l, n], bins) - 1
+    categorized_firing_rates[np.isnan(firing_rates)] = n_bins-1 # assign the last bin to all the ones that have nan values
 
-
-    # assert(not np.any((categorized_firing_rates.flatten() < 0)))
-    # assert(not np.any((categorized_firing_rates.flatten() >= n_bins)))
+    assert(not np.any((categorized_firing_rates.flatten() < 0)))
+    assert(not np.any((categorized_firing_rates.flatten() >= n_bins)))
 
     return categorized_firing_rates
 

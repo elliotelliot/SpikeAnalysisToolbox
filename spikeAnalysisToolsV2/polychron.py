@@ -380,7 +380,7 @@ class SpikePairInfoCaller:
             if n_target_neuron_spikes < self.post_spike_threshold:
                 continue
 
-            hist, new_times = pre_spike_hist(stimuli_spikes=[stim_spikes], target_neuron=post_neuron_id, preneurons=remaining_ids, time_step=self.time_step, max_time_delay=self.max_time_delay, start_time=self.start_time)
+            hist, new_times = pre_spike_hist(stimuli_spikes=[stim_spikes], target_neuron=post_neuron_id, preneurons=remaining_ids, time_step=self.time_step, max_time_delay=self.max_time_delay, start_time=self.start_time, multiple_spikes_per_bin_possible=True)
             # hist has shape [remaining_ids, time_delay]
 
             remaining_ids_relative = np.searchsorted(self.neuron_ids, remaining_ids)

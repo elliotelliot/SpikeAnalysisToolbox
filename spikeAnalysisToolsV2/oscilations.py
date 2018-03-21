@@ -57,13 +57,16 @@ def fit_fft(population_act, times, smooth_win_hz=3):
 
     max_frequency_intensity = np.argmax(ft_intensity)
     max_frequency_id_candidates = ssignal.argrelextrema(ft_intensity, np.greater)[0]
+    if(len(max_frequency_id_candidates)==0):
+        return 0, 0, (ft_frex, ft_intensity)
+
     max_frequency_id = max_frequency_id_candidates[ft_intensity[max_frequency_id_candidates] > max_frequency_intensity/2][0]
 
     # if False:
     #     act_peaks = fit_activity_peaks(population_act, times)
     #     d_act_peaks = act_peaks[1:] - act_peaks[:-1]
     #     frequency = 1/np.median(d_act_peaks)
-    #     max_frequency_id = np.argmin(np.abs(frequency-ft_frex))
+    #     max_frequency_id = np.argmin(np.abs(frequency - ft_frex))
 
     max_frequency = ft_frex[max_frequency_id]
 
@@ -94,6 +97,9 @@ def fit_activity_peaks(population_act, times, smooth_win=1e-2, min_peak_intensit
         population_act = ssignal.convolve(population_act, ssignal.gaussian(20, smooth_win/d_times), mode='same')
 
     extrema_ids = ssignal.argrelextrema(population_act, np.greater)[0]
+    if len(extrema_ids) ==0:
+        return np.zeros((0,))
+
     # extrema_ids = ssignal.find_peaks_cwt(population_act, np.arange(1, 20))
     extrema_values = population_act[extrema_ids]
     mean_peak_value = np.max(extrema_values)
