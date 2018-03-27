@@ -276,20 +276,20 @@ def stimuli_and_layerwise_firing_rates(spikes, network_architecture_info, info_t
 def randomly_draw_firing_rate_according_to_distribution(real_firing_rates, n_diff_stimuli, n_bins=100):
     """
     Given real firing rates draw n_diff_stimuli many firing rates each of which has the same distribution as the real one
-    :param real_firing_rates: numpy array of shape [n_layers, n_neurons]
+    :param real_firing_rates: numpy array of shape [n_stimuli, n_layers, n_neurons]
     :param n_diff_stimuli: int with the number of different stimuli
     :return: numpy layer of shape [n_diff_stimuli, n_layers, n_neurons]
     """
-    assert(len(real_firing_rates.shape) == 2)
-    n_layers, n_neurons = real_firing_rates.shape
+    assert(len(real_firing_rates.shape) == 3)
+    n_stimuli, n_layers, n_neurons = real_firing_rates.shape
 
     fake_responses = np.empty((n_diff_stimuli, n_layers, n_neurons))
 
     for l in range(n_layers):
-        probability_distribution, bin_edges = np.histogram(real_firing_rates[l, :], bins=n_bins)
+        probability_distribution, bin_edges = np.histogram(real_firing_rates[:, l, :], bins=n_bins)
         bin_centres = (bin_edges[:-1] + bin_edges[1:])/2
 
-        fake_responses[:, l, :] = np.random.choice(bin_centres, size=(n_diff_stimuli, n_neurons), replace=True, p=(probability_distribution/n_neurons))
+        fake_responses[:, l, :] = np.random.choice(bin_centres, size=(n_diff_stimuli, n_neurons), replace=True, p=(probability_distribution/(n_neurons*n_stimuli)))
 
 
     return fake_responses

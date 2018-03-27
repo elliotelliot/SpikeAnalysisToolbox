@@ -572,7 +572,7 @@ class BackTracer:
 
             n_syn_to_trace = int(len(weights_afferent_synapses) * self._percentage_thresholds[layer])
 
-            unique_values, count = np.unique(weights_afferent_synapses, return_counts=True)
+            # unique_values, count = np.unique(weights_afferent_synapses, return_counts=True)
             # if np.max(count) > n_syn_to_trace:
             #     raise RuntimeError("There are {} synapses with exactly the weight {} ".format(np.max(count), unique_values[np.argmax(count)]))
 

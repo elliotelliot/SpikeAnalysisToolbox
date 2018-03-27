@@ -258,7 +258,7 @@ def plot_information_measure_advancement(before, after, n_to_plot = 1000, item_l
             layerAX.legend()
 
 
-def plot_ranked_neurons(list_of_things, title, n_to_plot=100, item_label=None, vmin=None, vmax=None):
+def plot_ranked_neurons(list_of_things, title, n_to_plot=100, item_label=None, vmin=None, vmax=None, figsize=(17,6)):
     """
     Plot ranked neuron value. there will be as many subplots as layer. each contains as many lines as there are things
     value of first line at x=5 is the value of the 5th best neuron (with respect to the first thing)
@@ -285,13 +285,13 @@ def plot_ranked_neurons(list_of_things, title, n_to_plot=100, item_label=None, v
         vmin = np.min(sorted_stuff)
 
 
-    fig = plt.figure(figsize=(15, 8))
+    fig = plt.figure(figsize=figsize)
     fig.suptitle(title, fontsize=16)
 
 
     for layer in range(n_layer):
         layerAX  = fig.add_subplot(1, n_layer, layer + 1)
-        layerAX.set_title("Layer {}".format(layer))
+        layerAX.set_title("Layer {}".format(layer + 1))
         layerAX.set_xlabel("Neuron Rank")
         layerAX.set_ylim(vmin, 0.1 * (vmax-vmin) + vmax)
         for i, item in enumerate(item_label):
@@ -512,7 +512,7 @@ def plot_firing_rates_colored_by_object(firing_rates, object_list, title_string)
     ax.legend()
 
 
-def plot_mean_rates_by_stim(firing_rates, stimulus_ids, title_string, ylims=(0, 60), threshold=None, comparison_rates=None, rates_label=None):
+def plot_mean_rates_by_stim(firing_rates, stimulus_ids, title_string, ylims=(0, 60), threshold=None, comparison_rates=None, rates_label=None, stimulus_sort_key=None):
     """
     Make plot with labeled stimulus on x axis and firing rate on y axis. then each stimulus presentations is ploted by one marker and an error bar
     Optinally the firing rates untrained can be plotted too.
@@ -536,13 +536,16 @@ def plot_mean_rates_by_stim(firing_rates, stimulus_ids, title_string, ylims=(0, 
         assert(rates_label is None)
         rates_label = [None]
 
-
+    if stimulus_sort_key is not None:
+        ordered_stim_names = sorted(stimulus_ids.keys(), key = stimulus_sort_key)
+    else:
+        ordered_stim_names = list(stimulus_ids.keys())
 
 
     fig = plt.figure(figsize=(13, 7))
-    fig.suptitle(title_string)
+    # fig.suptitle(title_string)
     ax = fig.add_subplot(1,1,1)
-    ax.set_title("Firing Rates for Stimulus presentations, colored by object which contains the indicated stimuli")
+    ax.set_title(title_string)
 
     x_axis = np.arange(len(stimulus_ids.keys()))
 
@@ -551,7 +554,9 @@ def plot_mean_rates_by_stim(firing_rates, stimulus_ids, title_string, ylims=(0, 
         error_fr = np.zeros_like(mean_fr)
         x_ticks = list()
 
-        for stim_nr, (stim_name, presentation_ids) in enumerate(stimulus_ids.items()):
+        # for stim_nr, (stim_name, presentation_ids) in enumerate(stimulus_ids.items()):
+        for stim_nr, stim_name in enumerate(ordered_stim_names):
+            presentation_ids = stimulus_ids[stim_name]
             x_ticks.append((stim_nr, stim_name))
 
             mean_fr[stim_nr] = np.mean(rates[presentation_ids], axis=0)

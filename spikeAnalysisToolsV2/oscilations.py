@@ -2,7 +2,7 @@ import numpy as np
 import scipy.signal as ssignal
 from . import helper
 
-def population_activity(spike_times, time_range = None, bin_width=2e-3, n_neurons=1):
+def population_activity(spike_times, time_range = None, bin_width=1e-3, n_neurons=1):
     """
     Calculate population activity for discrete timepoints
     :param spike_times: numpy array of spiketimes
@@ -30,9 +30,10 @@ def population_activity(spike_times, time_range = None, bin_width=2e-3, n_neuron
 
     avg_firing_rate = (activity/bin_width)/n_neurons
 
+
     return times, avg_firing_rate
 
-def fit_fft(population_act, times, smooth_win_hz=3):
+def fit_fft(population_act, times, smooth_win_hz=2, apply_hanning=True):
     """
     Fit sinusoid to population_activity
     :param population_act: numpy array with intensity values for each timepoint (e.g. optained from oscilations.population_activity)
@@ -43,11 +44,14 @@ def fit_fft(population_act, times, smooth_win_hz=3):
     """
     bin_width = times[1] - times[0]
 
+    if apply_hanning:
+        population_act = population_act * np.hanning(len(population_act))
+
     ft = np.fft.rfft(population_act)
     ft_intensity = np.absolute(ft)
-    ft_intensity[0]=0 # ignore the constant term
 
     ft_frex = np.fft.rfftfreq(len(population_act), bin_width)
+    ft_intensity[ft_frex<3]=0 # ignore the constant terms
     d_freq = ft_frex[2] = ft_frex[1]
 
     if smooth_win_hz:
@@ -55,18 +59,23 @@ def fit_fft(population_act, times, smooth_win_hz=3):
         ft_intensity = ft_intensity_smoothed
 
 
-    max_frequency_intensity = np.argmax(ft_intensity)
+    max_frequency_intensity = np.max(ft_intensity)
+
     max_frequency_id_candidates = ssignal.argrelextrema(ft_intensity, np.greater)[0]
     if(len(max_frequency_id_candidates)==0):
         return 0, 0, (ft_frex, ft_intensity)
 
-    max_frequency_id = max_frequency_id_candidates[ft_intensity[max_frequency_id_candidates] > max_frequency_intensity/2][0]
+    max_frequency_id = max_frequency_id_candidates[
+        (ft_intensity[max_frequency_id_candidates] > (max_frequency_intensity * 0.7))
+    ][0]
 
     # if False:
     #     act_peaks = fit_activity_peaks(population_act, times)
     #     d_act_peaks = act_peaks[1:] - act_peaks[:-1]
     #     frequency = 1/np.median(d_act_peaks)
     #     max_frequency_id = np.argmin(np.abs(frequency - ft_frex))
+
+    max_frequency_id = np.argmax(ft_intensity)
 
     max_frequency = ft_frex[max_frequency_id]
 
@@ -232,7 +241,7 @@ def spikes_2_population_peaks(spikes, network_architecture, time_range):
     # peaks
     pop_peaks = dict()
     for pop_name, pop_activity in all_pop_activity.items():
-        peaks = fit_activity_peaks(pop_activity, times, smooth_win=5e-2)
+        peaks = fit_activity_peaks(pop_activity, times)
         pop_peaks[pop_name] = peaks
 
     return pop_peaks

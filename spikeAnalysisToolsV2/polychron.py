@@ -59,7 +59,11 @@ def population_normalised_pre_spike_hist(stimuli_spikes, target_neuron, preneuro
     assert(np.all(pop_times == times))
 
     prepopulation_ids = np.searchsorted(relevant_populations, prepopulations)
+    assert(np.all(np.isfinite(hist)))
+    assert(np.all(np.isfinite(hist)))
     normed_hist =  hist / population_hist[prepopulation_ids, :]
+
+    normed_hist[population_hist[prepopulation_ids, :] == 0] = 0
 
     return normed_hist, times
 
