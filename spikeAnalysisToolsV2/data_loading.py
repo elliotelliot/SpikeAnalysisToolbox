@@ -415,7 +415,7 @@ def load_testing_stimuli_indices_from_wildcarts(experiment_folder, objects):
 
     :param experiment_folder: path to the folder containting testing_list.txt
     :param objects: list of strings of type 1wcl (loc, color, type, pos)
-    :return: list of dictionaries, first item is the dictionary containing in it's filed 'elements' indices of all stimuli that fullfill the specifications of the first string in objects
+    :return: list of dictionaries, first item is the dictionary containing in it's filed 'indices' indices of all stimuli that fullfill the specifications of the first string in objects
     """
     result = [dict(filter=filter_string, elements=set(), indices=list(), count=0) for filter_string in objects]
 
