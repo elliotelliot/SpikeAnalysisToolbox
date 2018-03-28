@@ -1,20 +1,18 @@
-import pandas as pd
-import numpy as np
-import unittest
 import sys
+import unittest
 from timeit import default_timer as timer
 
+import numpy as np
+import pandas as pd
 
 sys.path.append("/Users/clemens/Documents/Code/AnalysisToolbox")
 
-import spikeAnalysisToolsV2.data_loading as data
-import spikeAnalysisToolsV2.firing_rates as firing
-import spikeAnalysisToolsV2.helper as helper
-import spikeAnalysisToolsV2.overviews as overview
-import spikeAnalysisToolsV2.combine_stimuli as combine
-import spikeAnalysisToolsV2.plotting as spikeplot
-import spikeAnalysisToolsV2.information_scores as info
-import spikeAnalysisToolsV2.synapse_analysis as synapse_analyis
+import data_loading as data
+import firing_rates as firing
+import helper as helper
+import combine_stimuli as combine
+import information_scores as info
+import synapse_analysis as synapse_analyis
 
 
 

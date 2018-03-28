@@ -1,9 +1,12 @@
+from multiprocessing import Pool
+
 import numpy as np
 import pandas as pd
+
+from . import combine_stimuli
 from . import helper
 from . import information_scores as info_analysis
-from . import combine_stimuli
-from multiprocessing import Pool
+
 
 def general_pre_spike_histogram(*args, normalize_population, **kwargs):
     """convinience function that calls either pre_spike_hist or pouplation_normalised_pre_spike_hist if normalise_poulation is false or true respectively"""
@@ -83,7 +86,8 @@ def pre_spike_hist(stimuli_spikes, target_neuron, preneurons, time_step, max_tim
         histogram: numpy array of shape (preneuron, timebin) -> for how many of the target neurons spikes the preneuron spiked timebin*timestep much time before the target neuron
         times: numpy array -> indices for the times corresponding to the second dimension in the array 'histogram'
     """
-    assert(not target_neuron in preneurons)
+    if (target_neuron in preneurons):
+        print("In pre_spike_hist the target neuron is actually in preneurons")
 
     if multiple_spikes_per_bin_possible is None:
         refractory_period = 0.002

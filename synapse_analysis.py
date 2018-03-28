@@ -1,7 +1,9 @@
 import numpy as np
 import pandas as pd
-from . import helper
 from numba import jit
+
+from . import helper
+
 
 class Synapse_Mask:
     """

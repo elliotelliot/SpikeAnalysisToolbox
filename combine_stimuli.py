@@ -1,7 +1,7 @@
 import numpy as np
-from numba import jit
 
 from . import firing_rates as firing
+
 
 def old_average_response(responses, list_of_objects):
     """

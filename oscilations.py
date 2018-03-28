@@ -1,6 +1,8 @@
 import numpy as np
 import scipy.signal as ssignal
+
 from . import helper
+
 
 def population_activity(spike_times, time_range = None, bin_width=1e-3, n_neurons=1):
     """

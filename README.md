@@ -48,7 +48,8 @@ I assume a certain naming convention for my stimuli:
 A stimulus has for example the name `1wcl` where each position in this 4 character word corresponds to an attribute of the
 stimulus. In this case: location=1, color=white, shape=circle, position_relative_to_location=left.
 
-If you use this naming convention you can load label structures as described above with bash style wildcards using functions from `data_loading.py`
+If you use this naming convention you can load label structures as described above with bash style wildcards using functions from `data_loading.py`.
+
 `load_testing_stimuli_indices_from_wildcarts(path_to_file_list, ['1***', '2***'])`
 Will return a list of 2 dictionaries, where the first one contains in it's field 'indices' all stimulus prestation indices where something was shown at location 1 with the other three attributes being arbitrary.
 

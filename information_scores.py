@@ -1,12 +1,12 @@
-import numpy as np
-from numba import jit
-from multiprocessing import Pool
-import scipy.stats as scistats
 import copy
+from multiprocessing import Pool
 
-from . import helper
+import numpy as np
+import scipy.stats as scistats
+from numba import jit
+
 from . import combine_stimuli as combine
-
+from . import helper
 
 
 def min_response_to_one_transform(firing_rates, objects):

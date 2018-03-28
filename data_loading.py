@@ -1,12 +1,10 @@
-import pandas as pd
-import numpy as np
 import csv
-from multiprocessing import Pool
-from functools import partial
 import os
+
+import numpy as np
+import pandas as pd
+
 from . import helper
-
-
 
 """
 Function to extract spikes from a binary or text file

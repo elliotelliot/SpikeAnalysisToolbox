@@ -3,6 +3,7 @@ import pandas as pd
 
 from . import helper
 
+
 def print_firing_rates_tables(subfolder_firing_rates, info_times, subfolders, extensions,
                        detailed_stimuli):
     """

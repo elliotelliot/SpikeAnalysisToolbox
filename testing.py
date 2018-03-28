@@ -1,30 +1,21 @@
-import numpy as np
-import pandas as pd
 import sys
 
-import spikeAnalysisToolsV2.data_loading
+import numpy as np
 
 sys.path.append("/Users/clemens/Documents/Code/AnalysisToolbox")
 
 import matplotlib.pyplot as plt
-import SpikeDataLoading as data
-import Activation_Analysis as acan
 from timeit import default_timer as timer
 
-
-
-import Firing_Rates as firing
-import Weights_Analysis as weights
-import spikeAnalysisToolsV2.data_loading as data
-import spikeAnalysisToolsV2.firing_rates as firing
-import spikeAnalysisToolsV2.helper as helper
-import spikeAnalysisToolsV2.overviews as overview
-import spikeAnalysisToolsV2.combine_stimuli as combine
-import spikeAnalysisToolsV2.plotting as spikeplot
-import spikeAnalysisToolsV2.information_scores as info
-import spikeAnalysisToolsV2.synapse_analysis as synapse_analysis
-import spikeAnalysisToolsV2.polychron as poly
-import spikeAnalysisToolsV2.oscilations as oscilations
+import data_loading as data
+import firing_rates as firing
+import helper as helper
+import combine_stimuli as combine
+import plotting as spikeplot
+import information_scores as info
+import synapse_analysis as synapse_analysis
+import polychron as poly
+import oscilations as oscilations
 
 
 
@@ -323,7 +314,7 @@ def shuffle_weight(path):
     network_architecture = dict(num_inh_neurons_per_layer=32 * 32, num_exc_neurons_per_layer=64 * 64, num_layers=4)
     synapses = data.load_network(path, True, True)
 
-    new_weights = synapse_analysis.shuffle_weights_within_layer(synapses, network_architecture, 128**2)
+    new_weights = synapse_analysis.shuffle_weights_within_layer(synapses, network_architecture, 128 ** 2)
 
     raw_new_weights = new_weights.weights.values
     raw_new_weights.tofile("{}/shuffled_weights.bin".format(path))
@@ -460,7 +451,7 @@ def test_oscilation_fitter():
 
     pop_name = "L0_exc"
 
-    times, activity = oscilations.population_activity(pops[pop_name], (2*stimulus_id + 1, 2*stimulus_id + 2), bin_width=4e-3)
+    times, activity = oscilations.population_activity(pops[pop_name], (2 * stimulus_id + 1, 2 * stimulus_id + 2), bin_width=4e-3)
 
     # activity = ssignal.convolve(activity, ssignal.gaussian(10, 1e-3/ 4e-3), mode='same')
 

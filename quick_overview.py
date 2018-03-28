@@ -1,16 +1,17 @@
 """Maent to be run as a comand line tool to produce some overviews of the experiment"""
 
-from optparse import OptionParser
-import numpy as np
 import os
 import sys
+from optparse import OptionParser
+
+import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 
 sys.path.append("/Users/clemens/Documents/Code/AnalysisToolbox")
-from spikeAnalysisToolsV2 import data_loading as data
-from spikeAnalysisToolsV2 import firing_rates as firing
-from spikeAnalysisToolsV2 import information_scores as info
-from spikeAnalysisToolsV2 import plotting as spikeplot
+import data_loading as data
+import firing_rates as firing
+import information_scores as info
+import plotting as spikeplot
 
 output_path = "/Users/clemens/Documents/Code/ModelClemens/output"
 overview_folder_name = "overview"

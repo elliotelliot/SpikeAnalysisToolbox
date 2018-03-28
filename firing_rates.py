@@ -1,12 +1,11 @@
+from multiprocessing import Pool
+
 import numpy as np
 import pandas as pd
-from multiprocessing import Pool
-from numba import jit
 
 # from helper import *
 from . import helper
-from . import firing_rates as firing
-from . import data_loading as data
+
 # from .. import data_loading as data
 
 """
@@ -260,10 +259,10 @@ def stimuli_and_layerwise_firing_rates(spikes, network_architecture_info, info_t
     stimuli_responses = list()
     for stimulus_nr in range(info_times["num_stimuli"]):
         # print("stimulus: {}".format(stimulus_nr))
-        all_fr_stimulus = firing.spikesToFR(spikes_in_stimuli[stimulus_nr], neuron_range = (0, total_per_layer * network_architecture_info["num_layers"]), time_range=(timestart, timeend))
+        all_fr_stimulus = spikesToFR(spikes_in_stimuli[stimulus_nr], neuron_range = (0, total_per_layer * network_architecture_info["num_layers"]), time_range=(timestart, timeend))
         # print("done with firing rates for all neurons")
 
-        layerwise = helper.split_into_layers(all_fr_stimulus,  network_architecture_info)
+        layerwise = helper.split_into_layers(all_fr_stimulus, network_architecture_info)
         # print("done with dividing them into layers")
 
         exc_inh_layerwise = [helper.split_exc_inh(layer, network_architecture_info) for layer in layerwise]
