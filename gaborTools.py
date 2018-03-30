@@ -2,6 +2,8 @@ import numpy as np
 import scipy.signal as sp
 
 class GaborVisualiser:
+    """Class to visualize the gabor filters. Note that the filter parameters are currently hardcoded"""
+
     psi = [0, np.pi]
     scales = [2]
     orient = [0, np.pi/4, np.pi/2, 3*np.pi/4]
@@ -29,7 +31,7 @@ class GaborVisualiser:
     def visualize_image(self, filtered_img, abs_values=True):
         """
         Take the image and try to produce an unfiltered version
-        :param filtered_img: image of shape (n_layers, dim, dim)
+        :param filtered_img: image of shape (n_layers, dim, dim), n_layers is the number of gabor filters in the input (each filter has its own input layer)
         :return: image of shape (dim, dim) with 'unfiltered' values
         """
         n_layers = filtered_img.shape[0]

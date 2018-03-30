@@ -5,22 +5,23 @@ import pandas as pd
 
 # from helper import *
 from . import helper
+from numba import jit
 
 # from .. import data_loading as data
 
-"""
-computes the time course of the instantanious Firing rate for layers
-Args:
-    spikes: pandas data frame
-    network_architecture: dict 
-    time_step: the temporal resolution
-Returns:
-    times: the start times for the bins. i.e. excitatory_timecourse[layer, timepoint_id, neuron_id] contains
-     the firint rate of the respective neuron in the intevall (times[timepoint_id], times[timepoint_id] + time_step)
-    excitatory_timecourse: numpy array with dimensions [layer, timepoint, neuronid]
-    inhibitroy_timecourse: numpy array of same shape. 
-"""
 def instant_FR_for_all_layers(spikes, network_architecture, time_step):
+    """
+    computes the time course of the instantanious Firing rate for layers
+    Args:
+        spikes: pandas data frame
+        network_architecture: dict
+        time_step: the temporal resolution
+    Returns:
+        times: the start times for the bins. i.e. excitatory_timecourse[layer, timepoint_id, neuron_id] contains
+         the firint rate of the respective neuron in the intevall (times[timepoint_id], times[timepoint_id] + time_step)
+        excitatory_timecourse: numpy array with dimensions [layer, timepoint, neuronid]
+        inhibitroy_timecourse: numpy array of same shape.
+    """
     n_neurons = (network_architecture["num_exc_neurons_per_layer"] + network_architecture["num_exc_neurons_per_layer"]) * network_architecture["num_layers"]
     #spikes_to_instantanious_FR(spikes, (0, n_neurons), time_step)
 
@@ -48,21 +49,21 @@ def instant_FR_for_all_layers(spikes, network_architecture, time_step):
     return time_exc, excitatory_timecourse, inhibitory_timecourse,
 
 
-"""
-Convert spikes into an instantaneus firing rate
-Args:
-    spikes: pandas data frame with fields "ids" and "times"
-    neuron_range: int tuple with start and end index
-    time_step: the time resolution
-    time_range: float tuple with the target time window
-
-Returns:
-    time: numpy array with the time steps
-    instantaneus_firing: numpy array of dimensions [timepoint, neuron_id] giving the scalar firing rate of the neuron in the intervall
-        time[timepoint], time[timepoint]+time_step
-
-"""
 def spikes_to_instantanious_FR(spikes, neuron_range, time_step, time_range=None):
+    """
+    Convert spikes into an instantaneus firing rate
+    Args:
+        spikes: pandas data frame with fields "ids" and "times"
+        neuron_range: int tuple with start and end index
+        time_step: the time resolution
+        time_range: float tuple with the target time window
+
+    Returns:
+        time: numpy array with the time steps
+        instantaneus_firing: numpy array of dimensions [timepoint, neuron_id] giving the scalar firing rate of the neuron in the intervall
+            time[timepoint], time[timepoint]+time_step
+
+    """
     assert ('ids' in spikes)
     assert ('times' in spikes)
 
@@ -113,20 +114,20 @@ def spikes_to_instantanious_FR(spikes, neuron_range, time_step, time_range=None)
     return np.array(range(t_start, t_end)) * time_step, instantanious_firing
 
 
-"""
- Function to convert a spike train into a set of firing rates
-
- Args:
-    ids: a list of numpy arrays of ids (e.g. for all stimuli)
-    times: a list of numpy arrays if times
-    neuron_range: (int, int) tuple, the ID of the first (inclusive) neuron to consider (needs to be known cause the last neuron could have never spiked)
-    time_range: range in which the spikes are considered. if None all the spikes are taken (full stimulus)
-
-Returns:
-    rates: pandas dataframe with columns "ids", "firing_rates"
-"""
 # @jit(cache=True)
 def spikesToFR(spikes, neuron_range, time_range=None):
+    """
+     Function to convert a spike train into a set of firing rates
+
+     Args:
+        ids: a list of numpy arrays of ids (e.g. for all stimuli)
+        times: a list of numpy arrays if times
+        neuron_range: (int, int) tuple, the ID of the first (inclusive) neuron to consider (needs to be known cause the last neuron could have never spiked)
+        time_range: range in which the spikes are considered. if None all the spikes are taken (full stimulus)
+
+    Returns:
+        rates: pandas dataframe with columns "ids", "firing_rates"
+    """
     assert ('ids' in spikes)
     assert ('times' in spikes)
     # Calculating the average firing rates (since we only present sounds for
@@ -164,23 +165,22 @@ def spikesToFR(spikes, neuron_range, time_range=None):
     return firing_rates
 
 
-"""
-    Given a  nested list with folder, calculate firing rates for every neuron in every layer for every stimulus
-    
-Args:
-    spikes_for_folder: nested list of shape [subfolder][extension]-> containing pandas dataframe with spike times and ids
-    info_neurons: dict -> (will throw an error if it does not have the right field ;) )
-    info_times:  dict
-    
-Returns:
-    nested list of dimensions [subfolder][extension][stimulus][layer][exh/inh]-> pandas data frame with columns "ids", "firing_rates"
-    
-    
-"""
-def calculate_rates_subfolder(spikes_for_folder, info_neurons, info_times):
+def calculate_rates_subfolder(spikes_for_folder, info_neurons, info_times, n_processes=5):
+    """
+        Given a  nested list with folder, calculate firing rates for every neuron in every layer for every stimulus
+
+    Args:
+        spikes_for_folder: nested list of shape [subfolder][extension]-> containing pandas dataframe with spike times and ids
+        info_neurons: dict -> (will throw an error if it does not have the right field ;) )
+        info_times:  dict
+
+    Returns:
+        nested list of dimensions [subfolder][extension][stimulus][layer][exh/inh]-> pandas data frame with columns "ids", "firing_rates"
 
 
-    worker_pool = Pool(processes=5)
+    """
+
+    worker_pool = Pool(processes=n_processes)
 
     subfolder_rates = list()
 
@@ -224,19 +224,19 @@ def slow_calculate_rates_subfolder(spikes_for_folder, info_neurons, info_times):
 
     return subfolder_rates
 
-"""
-Turn Spikes into firing rates for each stimulus and layer and neuron type
-
-Args:
-    spikes: pandas data frame with spike times and ids
-    network_architecture_info: dict
-    info_times: dict
-
-Returns:
-    nested list with dimensions meaning [stimulus, layer, (exc/inh)]
-"""
 # @jit(cache=True)
 def stimuli_and_layerwise_firing_rates(spikes, network_architecture_info, info_times):
+    """
+    Turn Spikes into firing rates for each stimulus and layer and neuron type
+
+    Args:
+        spikes: pandas data frame with spike times and ids
+        network_architecture_info: dict
+        info_times: dict
+
+    Returns:
+        nested list with dimensions meaning [stimulus, layer, (exc/inh)]
+    """
     length_of_stimulus = info_times["length_of_stimulus"]
     total_length = length_of_stimulus * info_times["num_stimuli"]
     timestart = info_times["time_start"]
@@ -294,7 +294,7 @@ def randomly_draw_firing_rate_according_to_distribution(real_firing_rates, n_dif
     return fake_responses
 
 
-# @jit(cache=True)
+@jit(cache=True)
 def digitize_firing_rates_with_equispaced_bins(firing_rates, n_bins, allow_nan_as_seperate_bin=False):
     """
     Digitizes firing rates such that every firing rate has a value in [0, n_bins[

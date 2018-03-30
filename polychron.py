@@ -184,11 +184,10 @@ def pre_spike_hist(stimuli_spikes, target_neuron, preneurons, time_step, max_tim
 
 def all_combination_histogram(stimuli_spikes, target_neuron_range, time_step, max_time_delay, start_time, multiple_spikes_per_bin_possible=None):
     """
-    for each pair of target neuron a histogram is computed about how often they spike in that delay to each other
+    for each pair of neurons in the target neuron range, a histogram is computed about how often they spike in that delay relative to each other
 
     :param stimuli_spikes: list of pandas dataframes, one for each stimulus, each containing columns "ids" and "times", the times should always start at 0 in each stimulus
     :param target_neuron_range: range of global indices of the target neurons.
-
     :param time_step: how broad the timebins in the histogram are
     :param max_time_delay: how long before the target neurons spike will we consider prespikes
     :param start_time: only spikes of the target_neuron that occur after this will be considered
@@ -224,10 +223,10 @@ def all_combination_histogram(stimuli_spikes, target_neuron_range, time_step, ma
 
 def all_stimuli_neuroncombination_histogram(stimuli_spikes, *args, **kwargs):
     """
-    Calls all_combination_histogram for each stimulus seperatly and transfrers the kwargs to it
+    Calls all_combination_histogram for each stimulus seperatly and transfrers the kwargs to it.
     :param stimuli_spikes:
-    :param args:
-    :param kwargs:
+    :param args: only kwargs are alowed
+    :param kwargs: see `all_combination_histogram` for a description of needed parameters
     :return: hist, times
         hist ... numpy array of shape (stimulus, preneuron, postneuron, delta_time) -> probability of preneuron spiking delat_time before postneuron
         times ... meaning of the times
@@ -265,7 +264,7 @@ def spike_pair_info(stimuli_spikes, neuron_ids, object_indices, max_time_delay, 
     :param time_step: width of the bins for the delay betwen pr and post spike
     :param n_bins_prob_table: how many different responses of a pair are possible for the probability table
     :param start_time: time within a presentation after which we look for pre post pairs
-    :param prob_2_info_fun: function that computes information based on the
+    :param prob_2_info_fun: function that computes information based on the probability table
     :return: numpy array of shape (object, time_delay, pre_neuron, post_neuron) information for the pair (pre_neuron, post_neuron, time_delay)
     """
     assert(np.all(neuron_ids[:-1] < neuron_ids[1:]))# sorted and unique
@@ -332,7 +331,7 @@ def threaded_spike_pair_info(stimuli_spikes, neuron_ids, object_indices, max_tim
     :param n_bins_prob_table: how many different responses of a pair are possible for the probability table
     :param start_time: time within a presentation after which we look for pre post pairs
     :param prob_2_info_fun: function that computes information based on the
-    :param post_min_spike_count: if a postneuron spikes less then this number. it is ignored
+    :param post_min_spike_count: if a postneuron spikes less then this number. it is ignored and all spikepairs that have it as a postneuron will get probability 0.
     :return: numpy array of shape (object, time_delay, pre_neuron, post_neuron) information for the pair (pre_neuron, post_neuron, time_delay)
     """
     assert(np.all(neuron_ids[:-1] < neuron_ids[1:]))# sorted and unique
@@ -355,6 +354,7 @@ def threaded_spike_pair_info(stimuli_spikes, neuron_ids, object_indices, max_tim
     return all_info_numpy, times
 
 class SpikePairInfoCaller:
+    """helper class for `threaded_spike_pair_info` """
     def __init__(self, stimuli_spikes, time_step, max_time_delay, start_time, neuron_ids, object_indices, n_bins_prob_table, prob_2_info_fun, post_min_spike_count=10):
         self.stimuli_spikes = stimuli_spikes
         self.time_step = time_step
@@ -427,6 +427,8 @@ def threaded_all_stimuli_neuroncombination_histogram(stimuli_spikes, *args, n_th
         hist ... numpy array of shape (stimulus, preneuron, postneuron, delta_time) -> probability of preneuron spiking delat_time before postneuron
         times ... meaning of the times
     """
+    import warnings
+    warnings.warn("If you are after the spike pair inormation, use threaded_spike_pair_info instead ", DeprecationWarning)
     assert(len(args)==0)
     times = None
     worker_pool = Pool(processes=n_threads)

@@ -8,9 +8,15 @@ from . import helper
 class Synapse_Mask:
     """
     Class that provides masks for a given network
-    Each function returns a boolean array that is true where the synapse is of the correct type
+    Each function returns a boolean array that is true where the synapse is of the correct type. You instantiate this object
+    ones for a network, and then you use the methods on the Synapse_Mask instance to get filters for the network.
     """
     def __init__(self, network_architecture_info, synapses):
+        """
+
+        :param network_architecture_info: usual dict
+        :param synapses: pandas dataframe with columns 'pre', 'post'. usually produced by `data_loading.load_network()`
+        """
         self.n_exc = network_architecture_info["num_exc_neurons_per_layer"]
         self.n_inh = network_architecture_info["num_inh_neurons_per_layer"]
         self.total_per_layer = self.n_exc + self.n_inh
@@ -70,12 +76,20 @@ class Synapse_Mask:
 
 
 def count_incoming_with_mask(synapses, mask):
+    """
+    For each neuron, count the number of afferent synapses, that satisfy the condition in mask.
+    :param synapses: usually produced by `data_loading.load_network()`
+    :param mask: usually taken from an instance of `Synapse_Mask`, e.g. `synapse_mask.exc_feed_forward()`
+    :return: pandas dataframe with columns 'ids', and 'synapse_count' giving the number of afferent synapses for each neuron-id
+    """
+
     synapses_in_category_post_ids = synapses[mask].post.values
 
     post_ids, counts = np.unique(synapses_in_category_post_ids, return_counts=True)
     return pd.DataFrame(data={'ids':post_ids, 'synapse_count': counts})
 
 def count_outgoing_with_mask(synapses, mask):
+    """see `count_incoming_with_mask`"""
     synapses_in_category_pre_ids = synapses[mask].pre.values
     pre_ids, counts = np.unique(synapses_in_category_pre_ids, return_counts=True)
     return pd.DataFrame(data={'ids': pre_ids, 'synapse_count': counts})
@@ -137,7 +151,8 @@ def neuron_stats_to_layer(neuron_info, input_layer_count, input_neurons_per_laye
 def weighted_presynaptic_actvity(mask, net, weights, firing_rates):
     """
     Calculates the sum over (presynaptic_FR * synapse_weight) for all synapses masked with 'mask'
-    :param mask: np boolean array to select the synapses
+
+    :param mask: np boolean array to select the synapses. Probably you want the mask to be true only for synapses that have the same postsynaptic neuron
     :param net: pandas dataframe with columns 'pre', 'post'
     :param weights: np array of shape [epochs, synapses] -> weight for that synapse at that epoch
     :param firing_rates: (exc_rates, inh_rates) -> each a numpy array of shape [epochs, objects, layer, neuron_id]
@@ -203,11 +218,11 @@ def paths_to_neurons(input_neurons, architecture, coefficient, max_path_length=1
 
     $$n_i = \sum_{p \in AllPathsFromInputNeuronTo_n_i} c ^{|p|}$$
 
-    :param input_neurons: list of source neuron ids
+    :param input_neurons: list of source neuron ids, that are active
     :param architecture: pandas dataframe with columns pre and post
     :param coefficient: each path is weighted by coefficient^(path_length)
     :param maximum_neuron_id: highest neuron id (in case there are no synapses to this neuron, for example if it is inhibitory)
-    :return:
+    :return: pandas dataframe with columns 'ids', 'path_values'
     """
 
     all_neurons = np.unique(np.concatenate([architecture.pre.values, architecture.post.values]))
@@ -255,6 +270,7 @@ def paths_to_neurons(input_neurons, architecture, coefficient, max_path_length=1
 def shuffle_weights_within_layer(synapses, network_architecture, n_neurons_per_input_layer):
     """
     Shuffle weighs within each category of neurons within each layer
+
     :param synapses: pandas dataframe with 'pre', 'post', 'weights'
     :param network_architecture: usual dict
     :param n_neurons_per_input_layer: how many input neurons are in each input layer
@@ -325,11 +341,11 @@ def receptive_field_of_neuron(pos, is_excitatory, synapses, network_info):
     Given position of a neuron calculate its receptive field. i.e. density of neurons in the 'previous' layer
     mapping onto the one given by pos
 
-    :param pos: tubple (layer, line, column)
-    :param is_excitatory: flag true-> pos neuron is excitatory
+    :param pos: tuple (layer, line, column)
+    :param is_excitatory: true-> pos neuron is excitatory
     :param synapses: synapses should only contain synapses of one type!
     :param network_info:
-    :return: numpy array of shape [lines, columns]-> number of connections from that neuron to the pos one
+    :return: numpy array of shape [rows, columns]-> number of connections from that neuron in the presynaptic layer to the pos-neuron one
     """
 
     id = helper.position_to_id(pos, is_excitatory, network_info)
@@ -481,7 +497,7 @@ class BackTracer:
 
     def __init__(self, synapses, network_info, input_dim=128, n_input_layer=8, weights=None, percentage_thresholds=None, mask=None):
         """
-        :param synapses: pandas data frame with at least pre and post ids
+        :param synapses: pandas data frame with at least 'pre' and 'post' ids
         :param weights: same shape as network. It will take the synapses with the strongest value her
         :param percentage_thresholds: top n% synapses are traced
         :param network_info:  dict(num_inh_neurons_per_layer=32 * 32, num_exc_neurons_per_layer=64 * 64, num_layers=4)
@@ -510,8 +526,9 @@ class BackTracer:
         :param layer:
         :param row:
         :param column:
-        :param scaled_input: False: returned matrix will be binary 1 if input neuron is connected to target 0 otherwise
-        True: returned matrix is scalar. product of synapse weights on the path that connects this neuron to the target neuron
+        :param scaled_input:
+            False: returned matrix will be binary 1 if input neuron is connected to target 0 otherwise
+            True: returned matrix contains floats. product of synapse weights on the path that connects this neuron to the target neuron
         :param percentage_thresholds: Optional if specified in the initializer
         :return: input_layer, numpy matrix of shape [input_layer, input_dim, input_dim]
         """

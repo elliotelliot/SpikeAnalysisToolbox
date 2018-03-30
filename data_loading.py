@@ -2,37 +2,38 @@ import csv
 import os
 
 import numpy as np
+import warnings
 import pandas as pd
 
 from . import helper
 
-"""
-Function to extract spikes from a binary or text file
-
-Args:
-    pathtofolder: String, Indicates path to output folder containing SpikeIDs/Times files
-    binaryfile: Boolean Flag, Indicates if the output to expect is .bin or .txt (True/False)
-
-Returns:
-    pandas data frame with columns "ids" and "times" for the neuron id and spike time
-"""
 def pandas_load_spikes(pathtofolder, binaryfile=True, input_neurons=False):
+    """
+    Function to extract spikes from a binary or text file
+
+    Args:
+        pathtofolder: String, Indicates path to output folder containing SpikeIDs/Times files
+        binaryfile: Boolean Flag, Indicates if the output to expect is .bin or .txt (True/False)
+
+    Returns:
+        pandas data frame with columns "ids" and "times" for the neuron id and spike time
+    """
     ids, times = get_spikes(pathtofolder=pathtofolder, binaryfile=binaryfile, input_neurons=input_neurons)
     return pd.DataFrame({"ids": ids, "times": times})
 
 
-"""
-Function to extract spike times and IDs from a binary or text file
-
-Args:
-    pathtofolder: String, Indicates path to output folder containing SpikeIDs/Times files
-    binaryfile: Boolean Flag, Indicates if the output to expect is .bin or .txt (True/False)
-
-Returns:
-    ids: numpy array of neuron ids for each spike
-    times: numpy array of spike times for each spike (corresponding to the ids
-"""
 def get_spikes(pathtofolder, binaryfile, input_neurons=False):
+    """
+    Function to extract spike times and IDs from a binary or text file
+
+    Args:
+        pathtofolder: String, Indicates path to output folder containing SpikeIDs/Times files
+        binaryfile: Boolean Flag, Indicates if the output to expect is .bin or .txt (True/False)
+
+    Returns:
+        ids: numpy array of neuron ids for each spike
+        times: numpy array of spike times for each spike (corresponding to the ids
+    """
     spike_ids = list()
     spike_times = list()
     id_filename = 'Neurons_SpikeIDs_Untrained_Epoch0'
@@ -74,20 +75,20 @@ def get_spikes(pathtofolder, binaryfile, input_neurons=False):
 
 
 
-"""
-Imports the ids and times for all supfolders and stores them in a list of pandas data frames
-
-Args:
-    masterpath: The Masterpath (i.e. "/Users/dev/Documents/Gisi/01_Spiking_Simulation/01_Spiking Network/Build/output/") 
-    subfolders: All of the Stimulations in and list that are supossed to be analysed (i.e.["ParameterTest_0_epochs_all/", "ParameterTest_0_epochs_8_Stimuli/"]).
-                If only one is of interest use ["ParameterTest_0_epochs/"]
-    extensions: All epochs that are supposed to be imported (i.e. ["initial/""] or ["initial", "testing/epoch1/", "testing/epoch2/", ..., "testing/epoch_n/"])
-    input_layer: If you want to look at the input layer only set this to true. 
-
-Returns:
-    all_subfolders: all supfolder spikes. shape [subfolder][extension]-> pandas data frame with all the spikes
-"""
 def load_spikes_from_subfolders(masterpath, subfolders, extensions, input_layer):
+    """
+    Imports the ids and times for all supfolders and stores them in a list of pandas data frames
+
+    Args:
+        masterpath: The Masterpath (i.e. "/Users/dev/Documents/Gisi/01_Spiking_Simulation/01_Spiking Network/Build/output/")
+        subfolders: All of the Stimulations in and list that are supossed to be analysed (i.e.["ParameterTest_0_epochs_all/", "ParameterTest_0_epochs_8_Stimuli/"]).
+                    If only one is of interest use ["ParameterTest_0_epochs/"]
+        extensions: All epochs that are supposed to be imported (i.e. ["initial/""] or ["initial", "testing/epoch1/", "testing/epoch2/", ..., "testing/epoch_n/"])
+        input_layer: If you want to look at the input layer only set this to true.
+
+    Returns:
+        all_subfolders: all supfolder spikes. shape [subfolder][extension]-> pandas data frame with all the spikes
+    """
     print("Start")
     all_subfolders = list()
     if input_layer:
@@ -116,23 +117,23 @@ def load_spikes_from_subfolders(masterpath, subfolders, extensions, input_layer)
 
 
 
-"""
-Function to extract the pre, post, weight and delays of a network structure
-
-Args:
-    pathtofolder: string path to the folder in which network files are stored
-    binaryfile: True/False flag if it is binary file
-    intial_weighs: True/False flag wether to load initial weights
-
-Returns:
-    Pandas data frame with the following colums:
-    pre: list of synapse presynaptic indices
-    post: list of synapse postsynaptic indices
-    delays: list of synaptic delays (in units of timesteps)
-    init_weights: list of synaptic weights (before training) only if initial_weights=True
-    weights: list of synaptic weights after training
-"""
 def load_network(pathtofolder, binaryfile=True, initial_weights=False):
+    """
+    Function to extract the pre, post, weight and delays of a network structure
+
+    Args:
+        pathtofolder: string path to the folder in which network files are stored
+        binaryfile: True/False flag if it is binary file
+        intial_weighs: True/False flag wether to load initial weights
+
+    Returns:
+        Pandas data frame with the following colums:
+        pre: list of synapse presynaptic indices
+        post: list of synapse postsynaptic indices
+        delays: list of synaptic delays (in units of timesteps)
+        init_weights: list of synaptic weights (before training) only if initial_weights=True
+        weights: list of synaptic weights after training
+    """
     if pathtofolder[-1] != "/":
         pathtofolder += "/"
 
@@ -250,13 +251,16 @@ def load_weights_all_epochs(basic_path, epoch_indices, epoch_folder="testing", i
 
 def load_stimulus_file_to_attribute_matrix(filename, attributes):
     """
-    reads stimulus names from file and translates them to a matrix of attribute values
+    reads stimulus names from file and translates them to a matrix of attribute values. Not realy used anymore.
+    Was needed for compatibility with gisberts stuff
 
     :param filename: name of file
     :param attributes: list of dicts -> pos_in_stim, and an entry for each possible value of that letter in the stimulus names. the first dictonary in this list will be in the first place in the resulting matrix
     :return:
     """
-    import numpy as np
+
+    warnings.warn("There is not really a reason why you should be using this. It was needed for compatibility with Gisberts code", DeprecationWarning)
+
     stimuli_collector = list()
 
     with open(filename, "r") as file:
@@ -385,14 +389,14 @@ def load_testing_stimuli_ids(*args, **kwargs):
     warnings.warn("Use the function load_testing_stimuli_dict instead of this one", DeprecationWarning)
     return load_testing_stimuli_dict(*args, **kwargs)
 
-def load_testing_stimuli_dict(experiment_folder):
+def load_testing_stimuli_dict(experiment_folder, file_list='testing_list.txt'):
     """
     :param experiment_folder:
     :return: dict with stimulus name as key and all the indices of this stimulus as list of ints under that key
     """
     cur_stim_idx = 0
     collector = dict()
-    with open(experiment_folder + "/testing_list.txt", "r") as file:
+    with open(experiment_folder + "/" + file_list, "r") as file:
         for line in file:
             raw_text = line.strip()
             if raw_text != "*":
@@ -412,8 +416,9 @@ def load_testing_stimuli_indices_from_wildcarts(experiment_folder, objects):
     e.g. 1**l would be a right border at location one neuron
 
     :param experiment_folder: path to the folder containting testing_list.txt
-    :param objects: list of strings of type 1wcl (loc, color, type, pos)
-    :return: list of dictionaries, first item is the dictionary containing in it's filed 'indices' indices of all stimuli that fullfill the specifications of the first string in objects
+    :param objects: list of wildcard filter strings. e.g. ['***l', '***r']
+    :return: list of dictionaries, first item is the dictionary that contains in it's filed 'indices', the indices of
+     all stimuli that fullfill the specifications of the first string in objects
     """
     result = [dict(filter=filter_string, elements=set(), indices=list(), count=0) for filter_string in objects]
 
@@ -457,18 +462,19 @@ def load_testing_stimuli_indices_from_wildcarts(experiment_folder, objects):
     return result
 
 
-def load_testing_stimuli_label_matrix(experiment_folder, objects, multi_object_delimiter="_"):
+def load_testing_stimuli_label_matrix(experiment_folder, objects, multi_object_delimiter="_", file_list="testing_list.txt"):
     """
     objects are specified with wildcarts. e.g. 1*cl is the object containing all stimuli
     with loc=1, type=circle, position=l but arbitrary color.
 
     If there are multiple objects according to the naming convention 1bcl_2bcl it is enough if one of them satisfies the wildcard
 
-    e.g. 1**l would be a right border at location one neuron
+    e.g. 1**l would be a right border at location one neuron (location 1, object left of it)
 
     :param experiment_folder: path to the folder containting testing_list.txt
     :param objects: list of strings of type 1wcl (loc, color, type, pos)
     :param multi_object_delimiter: char (if there are multiple objects in a stimulus the filename should contain <attributes one stim><multi_object_delimiter><attributes other stim> e.g. 1wcl_2bcl
+    :param file_list: (default: testing_list.txt), name of the file list
     :return: numpy array of shape [n_objects, n_stimuli] -> true if the stimulus contains an object specified by the corresponding wildcard
     """
     n_objects = len(objects)
@@ -497,7 +503,7 @@ def load_testing_stimuli_label_matrix(experiment_folder, objects, multi_object_d
 
     collector = list()
 
-    with open(experiment_folder + "/testing_list.txt", "r") as file:
+    with open(experiment_folder + "/" + file_list, "r") as file:
         for line in file:
             raw_text = line.strip()
 
@@ -517,7 +523,7 @@ def load_testing_stimuli_label_matrix(experiment_folder, objects, multi_object_d
 
 
 class FilterValues:
-    """class to save filter values"""
+    """class to save filter values, usually create instances through the factory method FilterValues.load_from_file"""
     def __init__(self, scale, orientation, phase, values, obj_name=None):
         """
         :param scale: int with scale of this filter
@@ -566,7 +572,8 @@ class FilterValues:
 
     def get_garbor_index(self, *args, **kwargs):
         """
-        returns the index of this filter
+        returns the index of this filter, The following parameters are given as default:
+        scales = [2], orientations = [0, 45, 90, 135], phases = [0, 180]. If they are incorect give the correct ones as key-word-argument
         :param scales, orientations, phases, any of these can be given as a key word argument as a list, for not given ones defaults will be used.
         :return: index of filter
         """
@@ -613,7 +620,7 @@ def load_filter_values_list(path_to_filter):
     """
     return list of FilterValues objects for the given stimulus
     :param path_to_filter: string path to the '.flt' directory
-    :return:
+    :return: list of objects of type FilterValues
     """
     assert(path_to_filter[-4:] == '.flt')
     subfolders = os.listdir(path_to_filter)

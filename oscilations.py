@@ -10,7 +10,7 @@ def population_activity(spike_times, time_range = None, bin_width=1e-3, n_neuron
     :param spike_times: numpy array of spiketimes
     :param time_range: (float, float) tuple with start and end time
     :param bin_width: width of a timebin
-    :param n_neurons: neurons that the spikes are from. to normalise activity
+    :param n_neurons: (optinal) number of neurons in the population to normalize it to an average activity
     :return: times, activity
         times: numpy array with times at which the activity has a certain value
         activity: population activity
@@ -41,8 +41,8 @@ def fit_fft(population_act, times, smooth_win_hz=2, apply_hanning=True):
     :param population_act: numpy array with intensity values for each timepoint (e.g. optained from oscilations.population_activity)
     :param times:  times at which the population activity was measured
     :param smooth_win_hz: smoothing the frequency spectrum enables saver finding of local maxima
-    :return frex, factor, spectrum : describe the oscilation as np.exp(2j * np.pi * x * frex) * factor |
-        spectrum... (freqeuncy, intensity)
+    :return frex, factor, spectrum : describes the oscilation as np.exp(2j * np.pi * x * frex) * factor, use `get_sinusoid(frex, factor)` to get a function describing the sinusoid |
+        spectrum... is itself a tuple (freqeuncy, intensity)
     """
     bin_width = times[1] - times[0]
 
@@ -223,8 +223,12 @@ def spikes_2_rel_oscilation_spikes(spikes, network_architecture, time_range):
 
 def spikes_2_population_peaks(spikes, network_architecture, time_range):
     """
+    Tranform spikes to times at which the population peaks. seperatly for each population
+    :param spikes: pandas dataframe with columns 'ids', 'times'
+    :param network_architecture: usual dict
+    :param time_range: (start, end) tupple with to floats indicating in which window to find the peaks
 
-    :return:
+    :return: dictionary[pop_name]->numpy array with the times of peaks for this population
     """
     populations = helper.split_into_populations(spikes, network_architecture)
 

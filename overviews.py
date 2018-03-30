@@ -9,6 +9,7 @@ def print_firing_rates_tables(subfolder_firing_rates, info_times, subfolders, ex
     """
     Prints Summary for Firing rates in the diferent layers. for all subfolders, extensions, stimuli
 
+    Outdated and weird
     """
 
     n_layers = len(subfolder_firing_rates[0][0][0])

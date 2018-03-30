@@ -1,4 +1,5 @@
 import numpy as np
+from numba import jit
 
 from . import firing_rates as firing
 
@@ -67,10 +68,10 @@ def min_responses(responses, list_of_objects):
 
 
 
-# @jit(cache=True)
+@jit(cache=True)
 def response_freq_table(firing_rates, objects, n_bins=3, allow_nan_as_seperate_bin=False):
     """
-    Combine multiple presenations (stimuli) of the same objects into a frequency table that gives you
+    Combine multiple stimulus presentations into seperate frequency tables (for each object) that gives you
     the probability of a certain response given an object (which might be present in one of its different transforms)
 
     :param firing_rates: numpy array of shape [stimuli, layer, neurons]

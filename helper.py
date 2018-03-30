@@ -1,16 +1,18 @@
 import numpy as np
 import pandas as pd
-"""
-Converts a long spike train into separate stimuli based upon a duration
-
-Args:
-    spikes: pandas DataFrame with ids and times
-    stimduration: float indicating the length of time by which to split the stimuli
-
-Returns:
-    spikes_per_stimulus: a list of pandas data frames with spikes and times
-"""
 def splitstimuli(spikes, stimduration, spikes_can_be_modified=True, num_stimuli=None):
+    """
+    Converts a long spike train into separate stimuli based on stimulus duration
+
+    Args:
+        spikes: pandas DataFrame with ids and times
+        stimduration: float indicating the length of time by which to split the stimuli
+        spikes_can_be_modified: if this is True the input variable 'spikes' will be modified. Gives a small speedup
+        num_stimuli: (optinal) excplicitly give the number of stimuli that were presented. (for example if there was no spike in the last stimulus then we need this.
+
+    Returns:
+        spikes_per_stimulus: a list of pandas data frames with spikes and times
+    """
     assert ("ids" in spikes)
     assert ("times" in spikes)
 
@@ -47,18 +49,18 @@ def splitstimuli(spikes, stimduration, spikes_can_be_modified=True, num_stimuli=
     return spikes_per_stimulus
 
 
-"""
-Takes a nested list with firing rates and arranges them in two numpy tensors (exc, inh)
-
-Args: 
-    all_stimuli_rates: nested list of shape [stimulus][layer][exc/inh] -> pandas dataframe with fields "ids", "firing_rate"
-
-Returns: 
-    (excitatory, inhibitory) 
-    each is a numpy array of shape [stimulus, layer, neuron_id] -> firing rate value
-
-"""
 def nested_list_of_stimuli_2_np(all_stimuli_rates):
+    """
+    Takes a nested list with firing rates and arranges them in two numpy tensors (exc, inh)
+
+    Args:
+        all_stimuli_rates: nested list of shape [stimulus][layer][exc/inh] -> pandas dataframe with fields "ids", "firing_rate"
+
+    Returns:
+        (excitatory, inhibitory)
+        each is a numpy array of shape [stimulus, layer, neuron_id] -> firing rate value
+
+    """
     n_stimuli = len(all_stimuli_rates)
     n_layer = len(all_stimuli_rates[0])
     n_neurons_exc = len(all_stimuli_rates[0][0][0])
@@ -77,7 +79,7 @@ def nested_list_of_stimuli_2_np(all_stimuli_rates):
 def nested_list_of_epochs_2_np(all_epoch_rates):
     """
     Convert nested list to two numpy arrays
-    :param all_epoch_rates: nestd list of shape [epoch][stimulus][layer][exc/inh] -> pandas dataframe with fields "ids" firing_rate
+    :param all_epoch_rates: nested list of shape [epoch][stimulus][layer][exc/inh] -> pandas dataframe with fields "ids" firing_rate
     :return: exc, inh - each a numpy array of shape [epoch, stimulus, layer, nueron_id] -> firing rate value
     """
     list_of_np_arrays = [nested_list_of_stimuli_2_np(epoch) for epoch in all_epoch_rates]
@@ -89,7 +91,7 @@ def nested_list_of_epochs_2_np(all_epoch_rates):
 
 
 def neuron_target_column_to_numpy_array(data, target_column, network_architecture):
-    """pandas dataframe with a column about each neuron to 2 numpy array with the values in that shape
+    """pandas dataframe with a column about each neuron to 2 numpy arrays with the values in that column.
 
     Args:
         data: pandas dataframe with columns "ids" and target_column
@@ -114,7 +116,8 @@ def neuron_target_column_to_numpy_array(data, target_column, network_architectur
 def take_multiple_elements_from_list(input_list, ids):
     """
     Take multiple elements indexed by ids out of input_list
-    :param input_list: list of arbitrary elemtns
+
+    :param input_list: list of arbitrary elements
     :param ids: list of integers
     :return: [obj for obj, i in enumerate(input_list) if i in ids]
     """
@@ -162,7 +165,7 @@ def id_to_position(id, network_info, pos_as_2d=True):
 
 def id_within_layer_to_pos(id, network_info, exc_neuron=True):
     """
-    Calculate position of neuron with its layer
+    Calculate position of neuron within its layer
     :param id: tuple of shape (layer, neuron_id) or neuron_id (as int)
     :param network_info: usual dict
     :return: tupple of shape: (layer, row, column) or (row, column)
@@ -196,7 +199,8 @@ def id_within_layer_to_pos(id, network_info, exc_neuron=True):
 
 def position_to_id(pos, is_excitatory, network_info):
     """
-    Calculate receptive field of a neuron
+    Convert a position tuple of a neuron into the absolute global id.
+
     :param pos: position of the neuron as a tuple [layer, line, column], or [layer, id_within_layer]
     :param is_excitatory: True -> excitatory neuron, False -> inhibitory neuron
     :param network_info: usual dict
@@ -243,7 +247,7 @@ def get_side_length(n_in_layer_type):
 def id_to_position_input(id, n_layer, side_length):
     """
     get input neuron coordinates
-    :param id: id of the neuron
+    :param id: id of the input neuron as Spike saves them (so negative)
     :param n_layer: number of input layers
     :param side_length: length of the input layer grid
     :return: coordinates as (layer, y, x)
@@ -271,18 +275,18 @@ def id_to_position_input(id, n_layer, side_length):
 
 
 
-"""
-Splits layer into excitatory and inhibitory neurons
-
-Args: 
-    neuron_activity: pandas data frame with columnd "ids" the rest is arbitrary, only one layer
-    network_architecture_info: dictionary with the fields: num_exc_neurons_per_layer, num_inh_neurons_per_layer
-
-Returns:
-    excitatory: containing only excitatory ones
-    inhibitory: pandas data frame with same columns as neuron_activity containing only the inhibitory ones
-"""
 def split_exc_inh(neuron_activity, network_architecture_info):
+    """
+    Splits layer into excitatory and inhibitory neurons
+
+    Args:
+        neuron_activity: pandas data frame with columnd "ids" the rest is arbitrary, only one layer
+        network_architecture_info: dictionary with the fields: num_exc_neurons_per_layer, num_inh_neurons_per_layer
+
+    Returns:
+        excitatory: containing only excitatory ones
+        inhibitory: pandas data frame with same columns as neuron_activity containing only the inhibitory ones
+    """
     assert ('ids' in neuron_activity)
     num_exc_neurons_per_layer = network_architecture_info["num_exc_neurons_per_layer"]
     num_inh_neurons_per_layer = network_architecture_info["num_inh_neurons_per_layer"]
@@ -295,18 +299,18 @@ def split_exc_inh(neuron_activity, network_architecture_info):
     return excitatory, inhibitory
 
 
-"""
-Divides the neuron activity into the different layers.
-it is agnostic about which neuron information is saved in the table (e.g. spike timings or firing rates) 
-
-Args:
-    neuron_activity:  pandas data frame with a column "ids" 
-    network_architecture_info: dictionary with the fields: num_exc_neurons_per_layer, num_inh_neurons_per_layer, num_layers
-    
-Returns:
-    list of data frames each with columsn ids and whater it was before. (ids are reduced to start with 0 in each layer)
-"""
 def split_into_layers(neuron_activity, network_architecture_info):
+    """
+    Divides the neuron activity into the different layers.
+    it is agnostic about which neuron information is saved in the table (e.g. spike timings or firing rates)
+
+    Args:
+        neuron_activity:  pandas data frame with a column "ids"
+        network_architecture_info: dictionary with the fields: num_exc_neurons_per_layer, num_inh_neurons_per_layer, num_layers
+
+    Returns:
+        list of data frames each with columns ids and whater it was before. (ids are reduced to start with 0 in each layer)
+    """
     assert('ids' in neuron_activity)
 
     layerwise_activity = list()
@@ -381,6 +385,8 @@ def epoch_subfolders_to_tensor(all_epochs):
 def random_label(n_objects, n_transforms, n_repeats):
     """
     Create random label where each stimuli always is part of the same object througout multiple repeats
+
+
     :param n_objects: number of objects
     :param n_transforms: number of transforms per object
     :param n_repeats: how often is each stimulus presented. (assumed that all stimulus are presented before one is presented again)
@@ -401,6 +407,7 @@ def random_label(n_objects, n_transforms, n_repeats):
 def object_list_2_boolean_label(object_list):
     """
     Transform object list to boolean label numpy array as used by the SingleCellDecoder class
+
     :param object_list: list of dictionaries. each is one object and contains the fields 'count' and 'indices'
     :return: numpy array of shape [n_objects, n_stimuli] -> True if the object is present in that stimulus
     """
@@ -509,6 +516,13 @@ def split_into_populations(neuron_values, network_architecture_info, population_
     return result
 
 def get_population_neuron_range(network_architecture_info, population_name="L{layer}_{type}"):
+    """
+    For all population the range of neuron_ids within it.
+    :param network_architecture_info:
+    :param population_name:
+    :return: dictionary with key [pop_name]-> (start_index, end_index) All neurons in that population have an id that satisfies:
+        start_index <= id < start_index
+    """
     n_layer = network_architecture_info["num_layers"]
     n_inh = network_architecture_info["num_inh_neurons_per_layer"]
     n_exc = network_architecture_info["num_exc_neurons_per_layer"]
@@ -541,6 +555,9 @@ def permute_ids_within_population(neuron_ids, network_architecture_info):
     ranomdly permute the ids, such that only id's within a population can change places.
     I.e. after permuting, the neuron_id in each position in the array will belong to the same population
     that the neuron_id value at that position in the array belonged to before the permutation.
+    (This can be used for example to permute the times of spikes. i.e. you have a pandas dataframe with columns
+    'ids', 'spike_times'. If you now use this function to permute the ids, it is the same as permuting the spike_times
+    and then sorting by time.
 
     :param neuron_ids: numpy array of integer ids of neurons. (for exaple taken from spikes.ids.values)
     :param network_architecture_info: dict with fields "num_exc_neurons_per_layer", "num_inh_neurons_per_layer", "num_layers"

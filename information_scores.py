@@ -141,7 +141,7 @@ def firing_rates_to_mutual_information(firing_rates, objects, n_bins, calc_inhib
     """
     Mutual Information
     :param firing_rates: nested list of shape [stimulus][layer][exc/inh] -> pandas dataframe with fields "ids", "firing_rate"
-    :param objects:
+    :param objects: list of list with stimulus ids for that object
     :param n_bins: how many bins the firing rates are sorted into (to make the firing rates discrete)
     :param calc_inhibitory: Flag (to save time)
     :return:
@@ -163,10 +163,10 @@ def firing_rates_to_mutual_information(firing_rates, objects, n_bins, calc_inhib
 @jit(cache=True)
 def single_cell_information(freq_table):
    """
-   Calculate single cell information according to Stringer 2005
+   Calculate single cell information according to Stringer 2005 from a frequency table
 
    :param freq_table:  numpy array of shape [object, layer, neuron_id, response_id]
-   :return:
+   :return: numpy array of shape [object, layer, neuron_id]
    """
    n_objects, n_layer, n_neurons, n_response_types = freq_table.shape
 
@@ -192,12 +192,12 @@ def single_cell_information(freq_table):
 # @jit(cache=True)
 def firing_rates_to_single_cell_information(firing_rates, objects, n_bins=3, calc_inhibitory=False):
    """
-   Single Cell information
+   Single Cell information from a list of firing rates
    :param firing_rates: nested list of shape [stimulus][layer][exc/inh] -> pandas dataframe with fields "ids", "firing_rate"
-   :param objects:
+   :param objects: list of list with stimulus ids for that object
    :param n_bins: how many bins the firing rates are sorted into (to make the firing rates discrete)
    :param calc_inhibitory: Flag (to save time)
-   :return:
+   :return: exc_info, inh_info, each is a numpy array of shape [n_objects, n_layer, n_neurons]-> info that neuron for the object
    """
    exc_rates, inh_rates = helper.nested_list_of_stimuli_2_np(firing_rates)
    exc_info = firing_rates_numpy_to_single_cell_info(exc_rates, objects, n_bins)
@@ -226,9 +226,9 @@ def firing_rates_numpy_to_single_cell_info(firing_rates, objects, n_bins=3, allo
 
 def information_spike_pairs(spike_pair_histogram, objects, n_bins=3):
     """
-    Calculate Information for spike pairs
+    Calculate Information for spike pairs. Eguchi et al 2018
     :param spike_pair_histogram: numpy array of shape (n_stimuli, pre_neurons, post_neurons, delta_time)
-    :param objects: list of length (n_stimuli) with ids of objects
+    :param objects: list of length (n_objects), each of them is a list with ids of stimulus presentations that contain that object
     :param n_bins:
     :return: numpy array of shape (n_objects, delta_time, pre_neurons*post_neurons)
     """
@@ -242,6 +242,7 @@ def information_spike_pairs(spike_pair_histogram, objects, n_bins=3):
 def information_all_epochs(firing_rates_all_epochs, strategy, *args, **kwargs):
     """
     :param firing_rates_all_epochs: nested list of shape [epoch][stimulus][layer][excitatory/inhibitory] -> pandas dataframe with "ids" and "firing_rates"
+    :param strategy: string that specifies which information score to use (e.g. single_cell_info, mutual_info)
     :return: exc_info, inh_info
     each is a numpy array of shape [epoch, object, layer, neuronid] -> information value
     """
@@ -345,7 +346,6 @@ def slow_information_all_epochs(firing_rates_all_epochs, objects, n_bins, calc_i
 
 
 
-# TODO refactor Caller, such that it first makes the numpy tensor, then applyies some normalisation then calls the information measures for exc (and maybe inhibitory)
 
 class Caller(object):
     def __init__(self, function, **kwargs):
@@ -365,7 +365,8 @@ class Caller(object):
 
 class SingleCellDecoder(object):
     """
-    Class that fits a threshold value for each neuron for each object. Bellow or above that object is present
+    Class that fits a threshold value for each neuron for each object.
+    A neuron says 'yes the object is present in this stimulus' iff it's firing rate is above the fitted threshold.
     """
 
     label_bigger_dict = {0: False, 1: True}
@@ -376,6 +377,10 @@ class SingleCellDecoder(object):
         :param allow_selectivity_by_being_off: if this is True. A neuron that is consistently below the threshold for object A will cary information for ojbect A. Otherwise neurons are only thought to be selective to object A if they have higher response for it.
         True: label for higher firing rates might be true or false, False: label for higher firing rate is always true
         """
+        if allow_selectivity_by_being_off:
+            import warnings
+            warnings.warn("Allowing a neuron to encode an objects present by it having a low firing rate to it is a bad idea and will screw with your brain. (i.e. in the case of mutually exclusive objects: On for object A <-> OFF for object B) ")
+
         self.thresholds = None # numpy array of shape [n_objects, n_layers, n_neurons] -> decission threshold
         self.label_bigger = None # shape [n_objects, n_layers, n_neurons] -> if true, all stimuli that have a higher FR in this neuron will get the label TRUE for that object, else FALSE
 
@@ -487,16 +492,18 @@ class SingleCellDecoder(object):
 
     def get_performance_summary(self, firing_rates, label):
         """
-        Calculate boolean array with predictions for each stimulus.
-
-        Note if a neuron always has firing rate zero in the training it will always predict the same truth value for all objects.
+        Calculate the performance of a trained decoder on this new set of presentations
 
         :param firing_rates: of shape [n_stimuli, n_layers, n_neurons]
+        :param label: binary numpy array of shape [n_objects, n_stimuli] => weather or not this object is present in that stimuli
+
+        :return an intance of type PerormanceSummary, you can call .accuracy on it for example. e.g. `decoder.get_performance_summary(rates, label).accuracy()`
         """
         predictions = self.transform(firing_rates)
         return PerformanceSummary(predictions, label)
 
     def performance_measure(self, false_positive_count, false_negative_count, label):
+        """The threshold is fitted to maximise this value"""
         n_objects, n_stimuli = label.shape
         return 1 - ((false_negative_count + false_positive_count) / n_stimuli)
 
